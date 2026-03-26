@@ -1,152 +1,150 @@
-# 导视图设计器 (Traffic Sign Designer)
+# Sigenerate
 
-一款基于 Flutter 的 Windows 应用程序，用于设计轨道交通导视图和道路标志。
+A Flutter desktop app for designing:
 
-## 功能特性
+- metro / rail transit guide signs
+- road route shields and direction signs
 
-### 轨道交通导视图
-- 支持 **上海地铁**、**广州地铁**、**港铁 MTR** 三种城市风格
-- 预置多种模板：
-  - 站名牌
-  - 方向指示牌
-  - 出口信息牌
-  - 换乘指引牌
-  - 线路信息牌
-- 支持选择线路编号和颜色
-- 支持自定义中英文站名
+The project currently targets **Windows desktop** and focuses on fast visual editing with live preview.
 
-### 道路标志
-- 支持 **GB 5768.2-2022** 国家标准
-- 多种标志类型：
-  - 国道 (G开头)
-  - 省道 (S开头)
-  - 县道 (X开头)
-  - 乡道 (Y开头)
-  - 高速公路
-  - 方向指示牌
-  - 出口预告标志
+## Features
 
-### 编辑功能
-- 实时 WYSIWYG 编辑预览
-- 模板选择与切换
-- 槽位编辑（点击选中）
-- 颜色预设管理
-- PNG 导出功能
+### Metro guide signs
 
-## 技术栈
+- Multiple city styles:
+  - Shanghai Metro
+  - Guangzhou Metro
+  - Hong Kong MTR
+- Preset metro templates for station name, direction, exit, transfer, and line information
+- A metro guide composition mode refactored with reference to [`mercutiojohn/vi-tool`](https://github.com/mercutiojohn/vi-tool)
+- Real SVG-based icon elements for:
+  - `line`
+  - `way`
+  - `stn`
+  - `oth`
+  - `sub`
+  - `cls`
+  - `clss`
+- Horizontal sign composition canvas with:
+  - drag-to-insert
+  - long-press reorder
+  - right-click edit / duplicate / delete
+  - undo / redo history
 
-- **Flutter** 3.x
-- **Dart** 3.x
-- Windows Desktop 平台
+### Road signs
 
-## 项目结构
+- Road sign editing based on `GB 5768.2-2022`
+- Multiple route shield / direction sign templates
+- Live template preview and parameter editing
 
-```
+## Tech Stack
+
+- Flutter
+- Dart
+- Windows desktop
+- `flutter_svg`
+
+## Project Structure
+
+```text
 lib/
-├── main.dart                 # 应用入口
-├── models/                   # 数据模型
-│   ├── metro_models.dart     # 轨道交通模型
-│   └── templates.dart        # 道路标志模板
-├── painters/                 # 自定义绘制
-│   ├── metro_painter.dart    # 轨道交通绘制器
-│   └── template_painter.dart # 道路标志绘制器
+├── main.dart
+├── models/
+│   ├── metro_models.dart
+│   ├── metro_guide_models.dart
+│   ├── templates.dart
+│   └── traffic_sign.dart
 ├── pages/
-│   └── combined_editor_page.dart # 主编辑页面
-└── theme/
-    └── app_theme.dart        # 主题配置
+│   ├── metro_editor_page.dart
+│   ├── metro_guide_editor_page.dart
+│   ├── road_editor_page.dart
+│   └── combined_editor_page.dart
+├── painters/
+│   ├── metro_painter.dart
+│   ├── template_painter.dart
+│   └── road_sign_painter.dart
+├── utils/
+│   ├── export_utils.dart
+│   ├── metro_guide_spacing.dart
+│   └── metro_guide_svg_utils.dart
+└── widgets/
+    ├── metro_guide_canvas.dart
+    ├── metro_guide_item.dart
+    ├── metro_guide_toolbar.dart
+    └── metro_guide_toolbar_item.dart
+
+assets/
+└── metro_guide/
 ```
 
-## 快速开始
+## Getting Started
 
-### 环境要求
+### Requirements
+
 - Flutter SDK 3.x
 - Windows 10/11
 
-### 安装依赖
+### Install dependencies
 
 ```bash
 flutter pub get
 ```
 
-### 运行应用
+### Run
 
 ```bash
 flutter run -d windows
 ```
 
-### 构建发布
+### Build
 
 ```bash
 flutter build windows --release
 ```
 
-构建产物位于 `build/windows/x64/runner/Release/` 目录。
+Build output:
 
-## 使用指南
+```text
+build/windows/x64/runner/Release/
+```
 
-### 创建轨道交通导视图
+## Metro Guide Refactor Notes
 
-1. 选择编辑模式：**轨道交通**
-2. 选择城市风格（上海/广州/港铁）
-3. 选择模板类型
-4. 点击画布中的槽位进行编辑
-5. 在右侧面板修改内容
-6. 导出为 PNG 图片
+The metro guide composition part was refactored to align more closely with the behavior and element system of [`vi-tool`](https://github.com/mercutiojohn/vi-tool):
 
-### 创建道路标志
+- imported real SVG guide elements into `assets/metro_guide/`
+- replaced placeholder Material icons with SVG rendering
+- implemented `vi-tool`-style spacing rules between adjacent guide elements
+- added runtime color replacement for color-band based SVG assets
+- wired the metro editor's "素材库" tab to the new horizontal composition canvas
 
-1. 选择编辑模式：**道路路牌**
-2. 选择标志模板
-3. 修改背景颜色
-4. 编辑各槽位内容
-5. 导出为 PNG 图片
+## Current Status
 
-## 设计规范
+Implemented:
 
-### 轨道交通
+- metro template editing
+- metro guide composition mode
+- road sign template editing
+- project save/open flow
+- SVG-based metro guide element rendering
 
-参考 railmapgen.org 样式标准：
+Still incomplete or worth improving:
 
-| 城市 | 背景色 | 文字色 | 线路环直径 |
-|------|--------|--------|-----------|
-| 上海地铁 | #383838 | 白色 | 60px |
-| 广州地铁 | #383838 | 白色 | 55px |
-| 港铁 MTR | #383838 | 白色 | 58px |
+- PNG export flow needs more end-to-end validation
+- some metro interactions can be aligned even further with `vi-tool`
+- README screenshots are not added yet
 
-### 道路标志
+## Asset and License Notes
 
-参考 GB 5768.2-2022 国家标准：
+Code in this repository is under the project license.
 
-| 标志类型 | 背景色 | 文字色 | 前缀 |
-|----------|--------|--------|------|
-| 国家高速公路 | #008B3D | 白色 | G |
-| 省级高速公路 | #008B3D | 白色 | S |
-| 国道 | #E60000 | 白色 | G |
-| 省道 | #FFD100 | 黑色 | S |
-| 县道 | #FFFFFF | 黑色 | X |
-| 乡道 | #FFFFFF | 黑色 | Y |
+However, some metro guide SVG assets were imported with reference to the `vi-tool` project. Please review the original repository and its asset/license notes before redistributing those resources commercially or separately from this project:
 
-## 开发说明
+- [`mercutiojohn/vi-tool`](https://github.com/mercutiojohn/vi-tool)
 
-### 添加新城市
+## References
 
-在 `lib/models/metro_models.dart` 中：
-
-1. 在 `MetroCityStyle` 枚举中添加新城市
-2. 在 `MetroCityInfo` 中添加城市配置
-3. 在 `MetroLineInfo` 中添加线路数据
-
-### 添加新模板
-
-1. 在对应模型文件中添加模板定义
-2. 在槽位中指定类型和位置
-3. 在绘制器中添加渲染逻辑
-
-## 许可证
-
-MIT License
-
-## 致谢
-
-- 轨道交通设计参考 [railmapgen.org](https://railmapgen.org)
-- 道路标志参考 GB 5768.2-2022 国家标准
+- [Flutter Desktop Docs](https://docs.flutter.dev/desktop)
+- [vi-tool](https://github.com/mercutiojohn/vi-tool)
+- [railmapgen.org](https://railmapgen.org)
+- [GB 5768.2-2022](https://www.gov.cn/)
