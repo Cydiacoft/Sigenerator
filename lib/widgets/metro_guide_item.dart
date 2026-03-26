@@ -44,7 +44,7 @@ class MetroGuideItemWidget extends StatelessWidget {
       return _buildTextItem();
     }
 
-    if (item.type == GuideItemType.clss && item.fileName == 'clss@custom.svg') {
+    if (_isCustomLine()) {
       return _buildCustomLineItem();
     }
 
@@ -146,6 +146,10 @@ class MetroGuideItemWidget extends StatelessWidget {
   }
 
   Widget _buildCustomLineItem() {
+    if (item.type == GuideItemType.line) {
+      return _buildLineBadgeItem();
+    }
+
     final lineCode = item.customText?.cn.trim().isNotEmpty == true
         ? item.customText!.cn.trim()
         : 'XX';
@@ -198,6 +202,39 @@ class MetroGuideItemWidget extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildLineBadgeItem() {
+    final lineCode = item.customText?.cn.trim().isNotEmpty == true
+        ? item.customText!.cn.trim()
+        : 'XX';
+    final lineColor = _parseColor(item.customColor ?? '#E4002B');
+
+    return Container(
+      width: 72,
+      height: 72,
+      decoration: BoxDecoration(
+        color: lineColor,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        lineCode,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.w800,
+          height: 1,
+        ),
+      ),
+    );
+  }
+
+  bool _isCustomLine() {
+    return item.fileName == 'line@custom.svg' ||
+        item.fileName == 'clss@custom.svg';
   }
 
   Widget _buildCustomSubItem() {

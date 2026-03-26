@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import '../models/metro_guide_models.dart';
 import '../models/metro_models.dart';
 import '../theme/app_theme.dart';
+import '../utils/export_utils.dart';
 import '../widgets/metro_guide_toolbar.dart';
 import '../widgets/metro_guide_canvas.dart';
 
@@ -16,6 +17,27 @@ class MetroGuideEditorPage extends StatefulWidget {
 }
 
 class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
+  static const List<String> _metroPresetColors = [
+    '#E4002B',
+    '#A09A39',
+    '#FAC000',
+    '#008C44',
+    '#823130',
+    '#AA7F3E',
+    '#E60085',
+    '#00A1DE',
+    '#8FC2E3',
+    '#98C5A3',
+    '#DA81A6',
+    '#5F6D3F',
+    '#8E3700',
+    '#4D3700',
+    '#BF83BC',
+    '#7D8B2F',
+    '#6D4C7D',
+    '#B75700',
+  ];
+
   final GlobalKey<MetroGuideCanvasState> _canvasKey = GlobalKey();
 
   MetroGuideProject? _currentProject;
@@ -334,8 +356,34 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
     _showColorBandDialog();
   }
 
-  void _onAddCustomLine() {
-    _showCustomLineDialog();
+  void _onAddCustomLine(GuideItemType type) {
+    _showCustomLineDialog(targetType: type);
+  }
+
+  void _onDeleteCustomItem(MetroGuideItem item) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('确认删除'),
+        content: const Text('确定要删除此自定义素材吗？画布中对应的元素不会被删除。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              setState(() {
+                _customAssets = _customAssets.where((i) => i.id != item.id).toList();
+                _hasUnsavedChanges = true;
+              });
+            },
+            child: const Text('删除', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _onImportSvg() async {
@@ -376,13 +424,17 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
 
   void _showEditDialog(String itemId) {
     final item = _items.firstWhere((i) => i.id == itemId);
-    if (item.type == GuideItemType.line ||
+    if ((item.type == GuideItemType.line &&
+            item.fileName != 'line@custom.svg') ||
         item.type == GuideItemType.cls ||
-        (item.type == GuideItemType.clss && item.fileName != 'clss@custom.svg')) {
+        (item.type == GuideItemType.clss &&
+            item.fileName != 'clss@custom.svg')) {
       _showColorEditDialog(item);
-    } else if (item.type == GuideItemType.clss &&
-        item.fileName == 'clss@custom.svg') {
-      _showCustomLineDialog(item: item);
+    } else if ((item.type == GuideItemType.line &&
+            item.fileName == 'line@custom.svg') ||
+        (item.type == GuideItemType.clss &&
+            item.fileName == 'clss@custom.svg')) {
+      _showCustomLineDialog(item: item, targetType: item.type);
     } else if (item.type == GuideItemType.text ||
         item.fileName.contains('text')) {
       _showTextEditDialog(item);
@@ -519,39 +571,20 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children:
-                    [
-                      '#E4002B',
-                      '#A09A39',
-                      '#FAC000',
-                      '#008C44',
-                      '#823130',
-                      '#AA7F3E',
-                      '#E60085',
-                      '#00A1DE',
-                      '#8FC2E3',
-                      '#98C5A3',
-                    ].map((color) {
-                      final isSelected = selectedColor == color;
-                      return InkWell(
-                        onTap: () =>
-                            setDialogState(() => selectedColor = color),
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: _parseColor(color),
-                            borderRadius: BorderRadius.circular(8),
-                            border: isSelected
-                                ? Border.all(color: Colors.white, width: 2)
-                                : null,
-                          ),
-                        ),
-                      );
-                    }).toList(),
+              _buildColorPreview(selectedColor),
+              const SizedBox(height: 16),
+              _buildColorChoices(
+                selectedColor: selectedColor,
+                circular: false,
+                onChanged: (color) =>
+                    setDialogState(() => selectedColor = color),
+              ),
+              const SizedBox(height: 12),
+              _buildColorPickerButton(
+                selectedColor: selectedColor,
+                title: '选择色带颜色',
+                onChanged: (color) =>
+                    setDialogState(() => selectedColor = color),
               ),
             ],
           ),
@@ -579,9 +612,16 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
     );
   }
 
-  void _showCustomLineDialog({MetroGuideItem? item}) {
-    final codeController = TextEditingController(text: item?.customText?.cn ?? '');
-    final nameController = TextEditingController(text: item?.customText?.en ?? '');
+  void _showCustomLineDialog({
+    MetroGuideItem? item,
+    GuideItemType targetType = GuideItemType.clss,
+  }) {
+    final codeController = TextEditingController(
+      text: item?.customText?.cn ?? '',
+    );
+    final nameController = TextEditingController(
+      text: item?.customText?.en ?? '',
+    );
     String selectedColor = item?.customColor ?? '#E4002B';
 
     showDialog(
@@ -634,39 +674,19 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
                 ),
               ),
               const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  '#E4002B',
-                  '#A09A39',
-                  '#FAC000',
-                  '#008C44',
-                  '#823130',
-                  '#AA7F3E',
-                  '#E60085',
-                  '#00A1DE',
-                  '#8FC2E3',
-                  '#98C5A3',
-                  '#DA81A6',
-                  '#7D8B2F',
-                ].map((color) {
-                  final isSelected = selectedColor == color;
-                  return InkWell(
-                    onTap: () => setDialogState(() => selectedColor = color),
-                    child: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: _parseColor(color),
-                        shape: BoxShape.circle,
-                        border: isSelected
-                            ? Border.all(color: Colors.white, width: 2)
-                            : null,
-                      ),
-                    ),
-                  );
-                }).toList(),
+              _buildColorPreview(selectedColor),
+              const SizedBox(height: 16),
+              _buildColorChoices(
+                selectedColor: selectedColor,
+                onChanged: (color) =>
+                    setDialogState(() => selectedColor = color),
+              ),
+              const SizedBox(height: 12),
+              _buildColorPickerButton(
+                selectedColor: selectedColor,
+                title: '选择线路颜色',
+                onChanged: (color) =>
+                    setDialogState(() => selectedColor = color),
               ),
             ],
           ),
@@ -679,8 +699,10 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
               onPressed: () {
                 final customLine = MetroGuideItem(
                   id: item?.id,
-                  fileName: 'clss@custom.svg',
-                  type: GuideItemType.clss,
+                  fileName: targetType == GuideItemType.line
+                      ? 'line@custom.svg'
+                      : 'clss@custom.svg',
+                  type: targetType,
                   customColor: selectedColor,
                   customText: CustomText(
                     cn: codeController.text.trim(),
@@ -695,7 +717,9 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
                     _hasUnsavedChanges = true;
                   });
                 } else {
-                  final itemIndex = _items.indexWhere((entry) => entry.id == item.id);
+                  final itemIndex = _items.indexWhere(
+                    (entry) => entry.id == item.id,
+                  );
                   final assetIndex = _customAssets.indexWhere(
                     (entry) => entry.id == item.id,
                   );
@@ -706,7 +730,9 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
                       _items = newItems;
                     }
                     if (assetIndex != -1) {
-                      final newAssets = List<MetroGuideItem>.from(_customAssets);
+                      final newAssets = List<MetroGuideItem>.from(
+                        _customAssets,
+                      );
                       newAssets[assetIndex] = customLine;
                       _customAssets = newAssets;
                     }
@@ -855,47 +881,19 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children:
-                    [
-                      '#E4002B',
-                      '#A09A39',
-                      '#FAC000',
-                      '#008C44',
-                      '#823130',
-                      '#AA7F3E',
-                      '#E60085',
-                      '#00A1DE',
-                      '#8FC2E3',
-                      '#98C5A3',
-                      '#DA81A6',
-                      '#5F6D3F',
-                      '#8E3700',
-                      '#4D3700',
-                      '#BF83BC',
-                      '#7D8B2F',
-                      '#6D4C7D',
-                      '#B75700',
-                    ].map((color) {
-                      final isSelected = selectedColor == color;
-                      return InkWell(
-                        onTap: () =>
-                            setDialogState(() => selectedColor = color),
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: _parseColor(color),
-                            shape: BoxShape.circle,
-                            border: isSelected
-                                ? Border.all(color: Colors.white, width: 2)
-                                : null,
-                          ),
-                        ),
-                      );
-                    }).toList(),
+              _buildColorPreview(selectedColor),
+              const SizedBox(height: 16),
+              _buildColorChoices(
+                selectedColor: selectedColor,
+                onChanged: (color) =>
+                    setDialogState(() => selectedColor = color),
+              ),
+              const SizedBox(height: 12),
+              _buildColorPickerButton(
+                selectedColor: selectedColor,
+                title: '选择元素颜色',
+                onChanged: (color) =>
+                    setDialogState(() => selectedColor = color),
               ),
             ],
           ),
@@ -940,39 +938,20 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
               ),
               const SizedBox(height: 16),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children:
-                    [
-                      '#E4002B',
-                      '#A09A39',
-                      '#FAC000',
-                      '#008C44',
-                      '#823130',
-                      '#AA7F3E',
-                      '#E60085',
-                      '#00A1DE',
-                      '#8FC2E3',
-                      '#98C5A3',
-                    ].map((color) {
-                      final isSelected = selectedColor == color;
-                      return InkWell(
-                        onTap: () =>
-                            setDialogState(() => selectedColor = color),
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: _parseColor(color),
-                            borderRadius: BorderRadius.circular(8),
-                            border: isSelected
-                                ? Border.all(color: Colors.white, width: 2)
-                                : null,
-                          ),
-                        ),
-                      );
-                    }).toList(),
+              _buildColorPreview(selectedColor),
+              const SizedBox(height: 16),
+              _buildColorChoices(
+                selectedColor: selectedColor,
+                circular: false,
+                onChanged: (color) =>
+                    setDialogState(() => selectedColor = color),
+              ),
+              const SizedBox(height: 12),
+              _buildColorPickerButton(
+                selectedColor: selectedColor,
+                title: '编辑色带颜色',
+                onChanged: (color) =>
+                    setDialogState(() => selectedColor = color),
               ),
             ],
           ),
@@ -1016,6 +995,110 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
     } catch (e) {
       return const Color(0xFF001D31);
     }
+  }
+
+  Widget _buildColorChoices({
+    required String selectedColor,
+    required ValueChanged<String> onChanged,
+    bool circular = true,
+  }) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _metroPresetColors.map((color) {
+        final isSelected = selectedColor.toUpperCase() == color.toUpperCase();
+        return InkWell(
+          onTap: () => onChanged(color),
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: _parseColor(color),
+              shape: circular ? BoxShape.circle : BoxShape.rectangle,
+              borderRadius: circular ? null : BorderRadius.circular(8),
+              border: isSelected
+                  ? Border.all(color: Colors.white, width: 2)
+                  : null,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildColorPreview(String selectedColor) {
+    return Container(
+      width: double.infinity,
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: _parseColor(selectedColor),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+      ),
+      alignment: Alignment.centerLeft,
+      child: Text(
+        selectedColor.toUpperCase(),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildColorPickerButton({
+    required String selectedColor,
+    required String title,
+    required ValueChanged<String> onChanged,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: () async {
+          final pickedColor = await _showColorPickerDialog(
+            initialColor: selectedColor,
+            title: title,
+          );
+          if (pickedColor != null) {
+            onChanged(pickedColor);
+          }
+        },
+        icon: const Icon(Icons.colorize_outlined, size: 18),
+        label: const Text('更多颜色 / HEX'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.white,
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
+          minimumSize: const Size.fromHeight(40),
+        ),
+      ),
+    );
+  }
+
+  Future<String?> _showColorPickerDialog({
+    required String initialColor,
+    required String title,
+  }) async {
+    final pickedColor = await showDialog<Color>(
+      context: context,
+      builder: (dialogContext) => ColorPickerDialog(
+        initialColor: _parseColor(initialColor),
+        title: title,
+      ),
+    );
+
+    if (pickedColor == null) {
+      return null;
+    }
+
+    return _colorToHex(pickedColor);
+  }
+
+  String _colorToHex(Color color) {
+    final argb = color.toARGB32().toRadixString(16).padLeft(8, '0');
+    return '#${argb.substring(2).toUpperCase()}';
   }
 
   void _undo() {
@@ -1067,7 +1150,11 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
             onAddColorBand: _onAddColorBand,
             onAddCustomLine: _onAddCustomLine,
             onImportSvg: _onImportSvg,
+            onDeleteCustomItem: _onDeleteCustomItem,
             customItems: {
+              GuideItemType.line: _customAssets
+                  .where((item) => item.type == GuideItemType.line)
+                  .toList(),
               GuideItemType.oth: _customAssets
                   .where((item) => item.type == GuideItemType.oth)
                   .toList(),

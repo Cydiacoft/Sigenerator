@@ -52,7 +52,7 @@ class MetroGuideToolbarItem extends StatelessWidget {
   }
 
   Widget _buildPreview(MetroGuideItem? guideItem) {
-    if (guideItem != null && guideItem.fileName == 'clss@custom.svg') {
+    if (guideItem != null && _isCustomLine(guideItem)) {
       return _buildCustomLinePreview(guideItem);
     }
 
@@ -94,6 +94,10 @@ class MetroGuideToolbarItem extends StatelessWidget {
   }
 
   Widget _buildCustomLinePreview(MetroGuideItem guideItem) {
+    if (guideItem.type == GuideItemType.line) {
+      return _buildLineBadgePreview(guideItem);
+    }
+
     final lineCode = guideItem.customText?.cn.trim().isNotEmpty == true
         ? guideItem.customText!.cn.trim()
         : 'XX';
@@ -137,6 +141,40 @@ class MetroGuideToolbarItem extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  Widget _buildLineBadgePreview(MetroGuideItem guideItem) {
+    final lineCode = guideItem.customText?.cn.trim().isNotEmpty == true
+        ? guideItem.customText!.cn.trim()
+        : 'XX';
+    final lineColor = _parseColor(guideItem.customColor ?? '#E4002B');
+
+    return Container(
+      width: compact ? 26 : 32,
+      height: compact ? 26 : 32,
+      decoration: BoxDecoration(
+        color: lineColor,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 1.4),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        lineCode,
+        textAlign: TextAlign.center,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: compact ? 8 : 10,
+          fontWeight: FontWeight.w800,
+          height: 1,
+        ),
+      ),
+    );
+  }
+
+  bool _isCustomLine(MetroGuideItem guideItem) {
+    return guideItem.fileName == 'line@custom.svg' ||
+        guideItem.fileName == 'clss@custom.svg';
   }
 
   Color _parseColor(String colorStr) {

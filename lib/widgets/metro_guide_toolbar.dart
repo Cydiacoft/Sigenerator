@@ -13,6 +13,7 @@ class MetroGuideToolbar extends StatelessWidget {
     required this.onAddColorBand,
     this.onAddCustomLine,
     this.onImportSvg,
+    this.onDeleteCustomItem,
     this.customItems = const {},
   });
 
@@ -20,8 +21,9 @@ class MetroGuideToolbar extends StatelessWidget {
   final Function(String) onEditItem;
   final VoidCallback onAddText;
   final VoidCallback onAddColorBand;
-  final VoidCallback? onAddCustomLine;
+  final ValueChanged<GuideItemType>? onAddCustomLine;
   final VoidCallback? onImportSvg;
+  final void Function(MetroGuideItem)? onDeleteCustomItem;
   final Map<GuideItemType, List<MetroGuideItem>> customItems;
 
   @override
@@ -47,6 +49,7 @@ class MetroGuideToolbar extends StatelessWidget {
                     onAddColorBand: onAddColorBand,
                     onAddCustomLine: onAddCustomLine,
                     onImportSvg: onImportSvg,
+                    onDeleteCustomItem: onDeleteCustomItem,
                     customItems: customItems[type] ?? const [],
                   ),
               ],
@@ -101,14 +104,16 @@ class _CategoryPanel extends StatefulWidget {
     required this.customItems,
     this.onAddCustomLine,
     this.onImportSvg,
+    this.onDeleteCustomItem,
   });
 
   final GuideItemType type;
   final Function(MetroGuideItem) onAddItem;
   final VoidCallback onAddText;
   final VoidCallback onAddColorBand;
-  final VoidCallback? onAddCustomLine;
+  final ValueChanged<GuideItemType>? onAddCustomLine;
   final VoidCallback? onImportSvg;
+  final void Function(MetroGuideItem)? onDeleteCustomItem;
   final List<MetroGuideItem> customItems;
 
   @override
@@ -199,7 +204,8 @@ class _CategoryPanelState extends State<_CategoryPanel> {
                       ],
                     ),
                   ),
-                if (widget.type == GuideItemType.clss &&
+                if ((widget.type == GuideItemType.line ||
+                        widget.type == GuideItemType.clss) &&
                     widget.onAddCustomLine != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
@@ -207,12 +213,13 @@ class _CategoryPanelState extends State<_CategoryPanel> {
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: widget.onAddCustomLine,
+                            onPressed: () =>
+                                widget.onAddCustomLine!(widget.type),
                             icon: const Icon(Icons.route, size: 14),
                             label: const Text('自定义线路'),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF7D8B2F),
-                              side: const BorderSide(color: Color(0xFF7D8B2F)),
+                              foregroundColor: _colorForType(widget.type),
+                              side: BorderSide(color: _colorForType(widget.type)),
                             ),
                           ),
                         ),
@@ -268,6 +275,7 @@ class _CategoryPanelState extends State<_CategoryPanel> {
                     itemBuilder: (context, index) {
                       final template = widget.customItems[index];
                       final item = MetroGuideItem(
+                        id: template.id,
                         fileName: template.fileName,
                         type: template.type,
                         customUrl: template.customUrl,
@@ -290,14 +298,58 @@ class _CategoryPanelState extends State<_CategoryPanel> {
                           opacity: 0.35,
                           child: MetroGuideToolbarItem(item: item),
                         ),
-                        child: MetroGuideToolbarItem(
-                          item: item,
-                          onTap: () => widget.onAddItem(item),
+                        child: Stack(
+                          children: [
+                            GestureDetector(
+                              onTap: () => widget.onAddItem(item),
+                              child: MetroGuideToolbarItem(item: item),
+                            ),
+                            Positioned(
+                              top: 2,
+                              right: 2,
+                              child: GestureDetector(
+                                onTap: () => widget.onDeleteCustomItem?.call(item),
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black54,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Icon(
+                                    Icons.close,
+                                    size: 12,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       );
                     },
                   ),
                 if (widget.customItems.isNotEmpty) const SizedBox(height: 8),
+                if (widget.customItems.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.2))),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Text(
+                            '自带素材',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.4),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.2))),
+                      ],
+                    ),
+                  ),
                 GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
