@@ -377,6 +377,7 @@ class _MetroEditorPageState extends State<MetroEditorPage>
       onEditItem: _editGuideItem,
       onAddText: _showTextDialog,
       onAddColorBand: _showColorBandDialog,
+      city: _selectedCity,
     );
   }
 
@@ -767,6 +768,7 @@ class _MetroEditorPageState extends State<MetroEditorPage>
         },
         onEditItem: _editGuideItem,
         onHistoryChanged: (_) {},
+        city: _selectedCity,
         backgroundColor: const Color(0xFF001D31),
       );
     }

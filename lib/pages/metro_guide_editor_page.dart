@@ -375,7 +375,9 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
             onPressed: () {
               Navigator.pop(context);
               setState(() {
-                _customAssets = _customAssets.where((i) => i.id != item.id).toList();
+                _customAssets = _customAssets
+                    .where((i) => i.id != item.id)
+                    .toList();
                 _hasUnsavedChanges = true;
               });
             },
@@ -386,7 +388,7 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
     );
   }
 
-  Future<void> _onImportSvg() async {
+  Future<void> _onImportCustomElement(GuideItemType targetType) async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['svg'],
@@ -400,12 +402,13 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
 
     try {
       final content = await File(path).readAsString();
+      final rawName = result!.files.single.name.replaceAll('.svg', '');
       final item = MetroGuideItem(
-        fileName: 'oth@local.svg',
-        type: GuideItemType.oth,
+        fileName: '${targetType.name}@local.svg',
+        type: targetType,
         customUrl: path,
         customSvgContent: content,
-        customText: CustomText(cn: result!.files.single.name, en: ''),
+        customText: CustomText(cn: rawName, en: rawName),
       );
 
       setState(() {
@@ -420,6 +423,20 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
         );
       }
     }
+  }
+
+  Map<GuideItemType, List<MetroGuideItem>> _getCustomItemsByType() {
+    return {
+      GuideItemType.line: _customAssets
+          .where((item) => item.type == GuideItemType.line)
+          .toList(),
+      GuideItemType.oth: _customAssets
+          .where((item) => item.type == GuideItemType.oth)
+          .toList(),
+      GuideItemType.clss: _customAssets
+          .where((item) => item.type == GuideItemType.clss)
+          .toList(),
+    };
   }
 
   void _showEditDialog(String itemId) {
@@ -1148,20 +1165,11 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
             onEditItem: _onEditItem,
             onAddText: _onAddText,
             onAddColorBand: _onAddColorBand,
+            city: _selectedCity,
             onAddCustomLine: _onAddCustomLine,
-            onImportSvg: _onImportSvg,
+            onImportCustomElement: _onImportCustomElement,
             onDeleteCustomItem: _onDeleteCustomItem,
-            customItems: {
-              GuideItemType.line: _customAssets
-                  .where((item) => item.type == GuideItemType.line)
-                  .toList(),
-              GuideItemType.oth: _customAssets
-                  .where((item) => item.type == GuideItemType.oth)
-                  .toList(),
-              GuideItemType.clss: _customAssets
-                  .where((item) => item.type == GuideItemType.clss)
-                  .toList(),
-            },
+            customItems: _getCustomItemsByType(),
           ),
           Expanded(
             child: Container(
@@ -1175,6 +1183,8 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
                       items: _items,
                       onItemsChanged: _onItemsChanged,
                       onEditItem: _onEditItem,
+                      city: _selectedCity,
+                      backgroundColor: _parseColor(_backgroundColor),
                       onHistoryChanged: (canUndo) {
                         setState(() {
                           _canUndo = canUndo;
@@ -1321,21 +1331,7 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
             },
           ),
           const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: _parseColor(_backgroundColor),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              _getCityName(_selectedCity),
-              style: const TextStyle(
-                fontSize: 13,
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
+          _buildCitySelector(),
           const Spacer(),
           _buildToolbarButton(
             icon: Icons.undo,
@@ -1361,6 +1357,114 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
         ],
       ),
     );
+  }
+
+  Widget _buildCitySelector() {
+    return PopupMenuButton<MetroCityStyle>(
+      offset: const Offset(0, 40),
+      color: AppTheme.darkBgSecondary,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: const BorderSide(color: AppTheme.darkBorder),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: _parseColor(_backgroundColor),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _getCityName(_selectedCity),
+              style: const TextStyle(
+                fontSize: 13,
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.arrow_drop_down, color: Colors.white, size: 20),
+          ],
+        ),
+      ),
+      itemBuilder: (context) => [
+        _buildCityItem(
+          city: MetroCityStyle.shanghai,
+          label: 'Shanghai Metro',
+          color: const Color(0xFFC23A30),
+        ),
+        _buildCityItem(
+          city: MetroCityStyle.guangzhou,
+          label: 'Guangzhou Metro',
+          color: const Color(0xFFF3D03E),
+        ),
+        _buildCityItem(
+          city: MetroCityStyle.mtr,
+          label: 'MTR',
+          color: const Color(0xFF007078),
+        ),
+        _buildCityItem(
+          city: MetroCityStyle.jr,
+          label: 'JR East',
+          color: const Color(0xFF7CC242),
+        ),
+      ],
+      onSelected: (city) {
+        setState(() {
+          _selectedCity = city;
+          _updateBackgroundColorByCity();
+          _hasUnsavedChanges = true;
+        });
+      },
+    );
+  }
+
+  PopupMenuItem<MetroCityStyle> _buildCityItem({
+    required MetroCityStyle city,
+    required String label,
+    required Color color,
+  }) {
+    return PopupMenuItem(
+      value: city,
+      child: Row(
+        children: [
+          Container(
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(label, style: const TextStyle(color: Colors.white)),
+          if (_selectedCity == city)
+            const Padding(
+              padding: EdgeInsets.only(left: 8),
+              child: Icon(Icons.check, color: Colors.green, size: 18),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _updateBackgroundColorByCity() {
+    switch (_selectedCity) {
+      case MetroCityStyle.shanghai:
+        _backgroundColor = '#001D31';
+        break;
+      case MetroCityStyle.guangzhou:
+        _backgroundColor = '#001428';
+        break;
+      case MetroCityStyle.mtr:
+        _backgroundColor = '#001F4D';
+        break;
+      case MetroCityStyle.jr:
+        _backgroundColor = '#0F4C3A';
+        break;
+    }
   }
 
   Widget _buildToolbarButton({
@@ -1441,11 +1545,13 @@ class _MetroGuideEditorPageState extends State<MetroGuideEditorPage> {
   String _getCityName(MetroCityStyle style) {
     switch (style) {
       case MetroCityStyle.shanghai:
-        return '上海地铁';
+        return 'Shanghai Metro';
       case MetroCityStyle.guangzhou:
-        return '广州地铁';
+        return 'Guangzhou Metro';
       case MetroCityStyle.mtr:
-        return '港铁 MTR';
+        return 'MTR';
+      case MetroCityStyle.jr:
+        return 'JR East';
     }
   }
 }

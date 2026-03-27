@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/metro_guide_models.dart';
+import '../models/metro_models.dart';
 import '../theme/app_theme.dart';
 import 'metro_guide_toolbar_item.dart';
 
@@ -11,8 +12,9 @@ class MetroGuideToolbar extends StatelessWidget {
     required this.onEditItem,
     required this.onAddText,
     required this.onAddColorBand,
+    required this.city,
     this.onAddCustomLine,
-    this.onImportSvg,
+    this.onImportCustomElement,
     this.onDeleteCustomItem,
     this.customItems = const {},
   });
@@ -21,13 +23,16 @@ class MetroGuideToolbar extends StatelessWidget {
   final Function(String) onEditItem;
   final VoidCallback onAddText;
   final VoidCallback onAddColorBand;
+  final MetroCityStyle city;
   final ValueChanged<GuideItemType>? onAddCustomLine;
-  final VoidCallback? onImportSvg;
+  final ValueChanged<GuideItemType>? onImportCustomElement;
   final void Function(MetroGuideItem)? onDeleteCustomItem;
   final Map<GuideItemType, List<MetroGuideItem>> customItems;
 
   @override
   Widget build(BuildContext context) {
+    final groupedItems = GuideItemAssets.groupedItemsByCity(city.name);
+
     return Container(
       width: 280,
       decoration: const BoxDecoration(
@@ -48,9 +53,11 @@ class MetroGuideToolbar extends StatelessWidget {
                     onAddText: onAddText,
                     onAddColorBand: onAddColorBand,
                     onAddCustomLine: onAddCustomLine,
-                    onImportSvg: onImportSvg,
+                    onImportCustomElement: onImportCustomElement,
                     onDeleteCustomItem: onDeleteCustomItem,
                     customItems: customItems[type] ?? const [],
+                    assetItems: groupedItems[type] ?? const [],
+                    city: city,
                   ),
               ],
             ),
@@ -102,8 +109,10 @@ class _CategoryPanel extends StatefulWidget {
     required this.onAddText,
     required this.onAddColorBand,
     required this.customItems,
+    required this.assetItems,
+    required this.city,
     this.onAddCustomLine,
-    this.onImportSvg,
+    this.onImportCustomElement,
     this.onDeleteCustomItem,
   });
 
@@ -112,9 +121,11 @@ class _CategoryPanel extends StatefulWidget {
   final VoidCallback onAddText;
   final VoidCallback onAddColorBand;
   final ValueChanged<GuideItemType>? onAddCustomLine;
-  final VoidCallback? onImportSvg;
+  final ValueChanged<GuideItemType>? onImportCustomElement;
   final void Function(MetroGuideItem)? onDeleteCustomItem;
   final List<MetroGuideItem> customItems;
+  final List<String> assetItems;
+  final MetroCityStyle city;
 
   @override
   State<_CategoryPanel> createState() => _CategoryPanelState();
@@ -131,7 +142,7 @@ class _CategoryPanelState extends State<_CategoryPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final items = GuideItemAssets.groupedItems[widget.type] ?? const <String>[];
+    final items = widget.assetItems;
     final totalCount = items.length + widget.customItems.length;
 
     return Column(
@@ -219,21 +230,48 @@ class _CategoryPanelState extends State<_CategoryPanel> {
                             label: const Text('自定义线路'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: _colorForType(widget.type),
-                              side: BorderSide(color: _colorForType(widget.type)),
+                              side: BorderSide(
+                                color: _colorForType(widget.type),
+                              ),
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                if (widget.type == GuideItemType.oth && widget.onImportSvg != null)
+                if (widget.type == GuideItemType.clss &&
+                    widget.onImportCustomElement != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: widget.onImportSvg,
+                            onPressed: () => widget.onImportCustomElement!(
+                              GuideItemType.clss,
+                            ),
+                            icon: const Icon(Icons.upload_file, size: 14),
+                            label: const Text('自定义元素'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF7D8B2F),
+                              side: const BorderSide(color: Color(0xFF7D8B2F)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (widget.type == GuideItemType.oth &&
+                    widget.onImportCustomElement != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => widget.onImportCustomElement!(
+                              GuideItemType.oth,
+                            ),
                             icon: const Icon(Icons.upload_file, size: 14),
                             label: const Text('导入本地 SVG'),
                             style: OutlinedButton.styleFrom(
@@ -267,11 +305,11 @@ class _CategoryPanelState extends State<_CategoryPanel> {
                     itemCount: widget.customItems.length,
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 8,
-                      crossAxisSpacing: 8,
-                      childAspectRatio: 1.8,
-                    ),
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 8,
+                          crossAxisSpacing: 8,
+                          childAspectRatio: 1.8,
+                        ),
                     itemBuilder: (context, index) {
                       final template = widget.customItems[index];
                       final item = MetroGuideItem(
@@ -291,24 +329,34 @@ class _CategoryPanelState extends State<_CategoryPanel> {
                           color: Colors.transparent,
                           child: SizedBox(
                             width: 96,
-                            child: MetroGuideToolbarItem(item: item),
+                            child: MetroGuideToolbarItem(
+                              item: item,
+                              city: widget.city,
+                            ),
                           ),
                         ),
                         childWhenDragging: Opacity(
                           opacity: 0.35,
-                          child: MetroGuideToolbarItem(item: item),
+                          child: MetroGuideToolbarItem(
+                            item: item,
+                            city: widget.city,
+                          ),
                         ),
                         child: Stack(
                           children: [
                             GestureDetector(
                               onTap: () => widget.onAddItem(item),
-                              child: MetroGuideToolbarItem(item: item),
+                              child: MetroGuideToolbarItem(
+                                item: item,
+                                city: widget.city,
+                              ),
                             ),
                             Positioned(
                               top: 2,
                               right: 2,
                               child: GestureDetector(
-                                onTap: () => widget.onDeleteCustomItem?.call(item),
+                                onTap: () =>
+                                    widget.onDeleteCustomItem?.call(item),
                                 child: Container(
                                   padding: const EdgeInsets.all(2),
                                   decoration: BoxDecoration(
@@ -334,7 +382,11 @@ class _CategoryPanelState extends State<_CategoryPanel> {
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Row(
                       children: [
-                        Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.2))),
+                        Expanded(
+                          child: Divider(
+                            color: Colors.white.withValues(alpha: 0.2),
+                          ),
+                        ),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: Text(
@@ -346,7 +398,11 @@ class _CategoryPanelState extends State<_CategoryPanel> {
                             ),
                           ),
                         ),
-                        Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.2))),
+                        Expanded(
+                          child: Divider(
+                            color: Colors.white.withValues(alpha: 0.2),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -364,7 +420,7 @@ class _CategoryPanelState extends State<_CategoryPanel> {
                     final fileName = items[index];
                     final item = MetroGuideItem(
                       fileName: fileName,
-                      type: GuideItemAssets.getTypeFromFileName(fileName),
+                      type: widget.type,
                     );
                     return Draggable<MetroGuideItem>(
                       data: item,
@@ -372,15 +428,22 @@ class _CategoryPanelState extends State<_CategoryPanel> {
                         color: Colors.transparent,
                         child: SizedBox(
                           width: 96,
-                          child: MetroGuideToolbarItem(fileName: fileName),
+                          child: MetroGuideToolbarItem(
+                            fileName: fileName,
+                            city: widget.city,
+                          ),
                         ),
                       ),
                       childWhenDragging: Opacity(
                         opacity: 0.35,
-                        child: MetroGuideToolbarItem(fileName: fileName),
+                        child: MetroGuideToolbarItem(
+                          fileName: fileName,
+                          city: widget.city,
+                        ),
                       ),
                       child: MetroGuideToolbarItem(
                         fileName: fileName,
+                        city: widget.city,
                         onTap: () => widget.onAddItem(item),
                       ),
                     );

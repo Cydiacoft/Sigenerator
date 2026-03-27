@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../models/metro_guide_models.dart';
+import '../models/metro_models.dart';
 import '../theme/app_theme.dart';
 import '../utils/metro_guide_spacing.dart';
 import 'metro_guide_item.dart';
@@ -12,6 +13,7 @@ class MetroGuideCanvas extends StatefulWidget {
   final Function(List<MetroGuideItem>) onItemsChanged;
   final Function(String) onEditItem;
   final Function(bool) onHistoryChanged;
+  final MetroCityStyle city;
   final Color backgroundColor;
 
   const MetroGuideCanvas({
@@ -20,6 +22,7 @@ class MetroGuideCanvas extends StatefulWidget {
     required this.onItemsChanged,
     required this.onEditItem,
     required this.onHistoryChanged,
+    required this.city,
     this.backgroundColor = const Color(0xFF001D31),
   });
 
@@ -154,6 +157,7 @@ class MetroGuideCanvasState extends State<MetroGuideCanvas> {
           opacity: 0.85,
           child: MetroGuideItemWidget(
             item: item,
+            city: widget.city,
             isActive: _activeItemId == item.id,
             isDragging: true,
             onTap: () {},
@@ -164,6 +168,7 @@ class MetroGuideCanvasState extends State<MetroGuideCanvas> {
         opacity: 0.3,
         child: MetroGuideItemWidget(
           item: item,
+          city: widget.city,
           isActive: _activeItemId == item.id,
           onTap: () {},
         ),
@@ -174,6 +179,7 @@ class MetroGuideCanvasState extends State<MetroGuideCanvas> {
             _showContextMenu(details.globalPosition, item, index),
         child: MetroGuideItemWidget(
           item: item,
+          city: widget.city,
           isActive: _activeItemId == item.id,
           onTap: () => setState(() => _activeItemId = item.id),
         ),

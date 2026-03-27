@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../models/metro_guide_models.dart';
+import '../models/metro_models.dart';
 import '../theme/app_theme.dart';
 import '../utils/metro_guide_svg_utils.dart';
 
@@ -13,12 +14,14 @@ class MetroGuideItemWidget extends StatelessWidget {
     required this.item,
     required this.isActive,
     required this.onTap,
+    this.city,
     this.isDragging = false,
   });
 
   final MetroGuideItem item;
   final bool isActive;
   final VoidCallback onTap;
+  final MetroCityStyle? city;
   final bool isDragging;
 
   @override
@@ -45,7 +48,10 @@ class MetroGuideItemWidget extends StatelessWidget {
     }
 
     if (_isCustomLine()) {
-      return _buildCustomLineItem();
+      return SvgPicture.string(
+        MetroGuideSvgUtils.buildCustomLineSvg(item),
+        fit: BoxFit.contain,
+      );
     }
 
     if (item.type == GuideItemType.sub &&
@@ -59,7 +65,8 @@ class MetroGuideItemWidget extends StatelessWidget {
       return SvgPicture.string(item.customSvgContent!, fit: BoxFit.contain);
     }
 
-    if (item.customUrl != null && item.customUrl!.toLowerCase().endsWith('.svg')) {
+    if (item.customUrl != null &&
+        item.customUrl!.toLowerCase().endsWith('.svg')) {
       return SvgPicture.file(File(item.customUrl!), fit: BoxFit.contain);
     }
 
@@ -68,6 +75,7 @@ class MetroGuideItemWidget extends StatelessWidget {
         future: MetroGuideSvgUtils.loadColoredSvg(
           item.fileName,
           item.customColor!,
+          city,
         ),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
@@ -83,7 +91,7 @@ class MetroGuideItemWidget extends StatelessWidget {
     }
 
     return SvgPicture.asset(
-      MetroGuideSvgUtils.assetPath(item.fileName),
+      MetroGuideSvgUtils.assetPath(item.fileName, city),
       fit: BoxFit.contain,
     );
   }
@@ -141,93 +149,6 @@ class MetroGuideItemWidget extends StatelessWidget {
               color: _parseColor(item.colorBandColor ?? '#001D31'),
             ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildCustomLineItem() {
-    if (item.type == GuideItemType.line) {
-      return _buildLineBadgeItem();
-    }
-
-    final lineCode = item.customText?.cn.trim().isNotEmpty == true
-        ? item.customText!.cn.trim()
-        : 'XX';
-    final lineName = item.customText?.en.trim().isNotEmpty == true
-        ? item.customText!.en.trim()
-        : '自定义线路';
-    final lineColor = _parseColor(item.customColor ?? '#E4002B');
-
-    return Container(
-      constraints: const BoxConstraints(minWidth: 120, minHeight: 80),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0E1525),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white, width: 1.5),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(color: lineColor, shape: BoxShape.circle),
-            alignment: Alignment.center,
-            child: Text(
-              lineCode,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                height: 1,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Flexible(
-            child: Text(
-              lineName,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                height: 1.05,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLineBadgeItem() {
-    final lineCode = item.customText?.cn.trim().isNotEmpty == true
-        ? item.customText!.cn.trim()
-        : 'XX';
-    final lineColor = _parseColor(item.customColor ?? '#E4002B');
-
-    return Container(
-      width: 72,
-      height: 72,
-      decoration: BoxDecoration(
-        color: lineColor,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        lineCode,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 20,
-          fontWeight: FontWeight.w800,
-          height: 1,
-        ),
       ),
     );
   }

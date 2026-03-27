@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-enum MetroCity { shanghai, guangzhou, mtr }
+enum MetroCity { shanghai, guangzhou, mtr, jr }
 
-enum MetroCityStyle { shanghai, guangzhou, mtr }
+enum MetroCityStyle { shanghai, guangzhou, mtr, jr }
 
 class MetroCityInfo {
   final MetroCityStyle style;
@@ -56,7 +56,7 @@ class MetroCityInfo {
   static const mtr = MetroCityInfo(
     style: MetroCityStyle.mtr,
     city: MetroCity.mtr,
-    name: '港铁 MTR',
+    name: 'MTR',
     bgColor: Color(0xFF001D31),
     textColor: Colors.white,
     lineBadgeSize: 58,
@@ -65,7 +65,19 @@ class MetroCityInfo {
     fontFamily: 'Arial',
   );
 
-  static const List<MetroCityInfo> all = [shanghai, guangzhou, mtr];
+  static const jr = MetroCityInfo(
+    style: MetroCityStyle.jr,
+    city: MetroCity.jr,
+    name: 'JR East',
+    bgColor: Color(0xFF0F4C3A),
+    textColor: Colors.white,
+    lineBadgeSize: 58,
+    lineBadgeFontSize: 18,
+    baseFontSize: 13,
+    fontFamily: 'Arial',
+  );
+
+  static const List<MetroCityInfo> all = [shanghai, guangzhou, mtr, jr];
 }
 
 class MetroLineInfo {
@@ -94,6 +106,8 @@ class MetroLineInfo {
         return guangzhouLines;
       case MetroCityStyle.mtr:
         return mtrLines;
+      case MetroCityStyle.jr:
+        return jrLines;
     }
   }
 
@@ -102,126 +116,217 @@ class MetroLineInfo {
       num: 1,
       name: '1号线',
       nameEn: 'Line 1',
-      color: Color(0xFFE4002B),
+      color: Color(0xFFC23A30),
       city: MetroCity.shanghai,
     ),
     MetroLineInfo(
       num: 2,
       name: '2号线',
       nameEn: 'Line 2',
-      color: Color(0xFFA09A39),
+      color: Color(0xFFC23A30),
       city: MetroCity.shanghai,
     ),
     MetroLineInfo(
       num: 3,
       name: '3号线',
       nameEn: 'Line 3',
-      color: Color(0xFFFAC000),
+      color: Color(0xFF006098),
       city: MetroCity.shanghai,
     ),
     MetroLineInfo(
       num: 4,
       name: '4号线',
       nameEn: 'Line 4',
-      color: Color(0xFF008C44),
+      color: Color(0xFFE60033),
       city: MetroCity.shanghai,
     ),
     MetroLineInfo(
       num: 5,
       name: '5号线',
       nameEn: 'Line 5',
-      color: Color(0xFF823130),
+      color: Color(0xFF008E9C),
       city: MetroCity.shanghai,
     ),
     MetroLineInfo(
       num: 6,
       name: '6号线',
       nameEn: 'Line 6',
-      color: Color(0xFFAA7F3E),
+      color: Color(0xFF008E9C),
       city: MetroCity.shanghai,
     ),
     MetroLineInfo(
       num: 7,
       name: '7号线',
       nameEn: 'Line 7',
-      color: Color(0xFFE60085),
+      color: Color(0xFFA6217F),
       city: MetroCity.shanghai,
     ),
     MetroLineInfo(
       num: 8,
       name: '8号线',
       nameEn: 'Line 8',
-      color: Color(0xFF00A1DE),
+      color: Color(0xFFD29700),
       city: MetroCity.shanghai,
     ),
     MetroLineInfo(
       num: 9,
       name: '9号线',
       nameEn: 'Line 9',
-      color: Color(0xFF8FC2E3),
+      color: Color(0xFFFAC671),
       city: MetroCity.shanghai,
     ),
     MetroLineInfo(
       num: 10,
       name: '10号线',
       nameEn: 'Line 10',
-      color: Color(0xFF98C5A3),
+      color: Color(0xFF009B6B),
       city: MetroCity.shanghai,
     ),
     MetroLineInfo(
       num: 11,
       name: '11号线',
       nameEn: 'Line 11',
-      color: Color(0xFFDA81A6),
+      color: Color(0xFF8FC31F),
       city: MetroCity.shanghai,
     ),
     MetroLineInfo(
       num: 12,
       name: '12号线',
       nameEn: 'Line 12',
-      color: Color(0xFF5F6D3F),
+      color: Color(0xFF009BC0),
       city: MetroCity.shanghai,
     ),
     MetroLineInfo(
       num: 13,
       name: '13号线',
       nameEn: 'Line 13',
-      color: Color(0xFF8E3700),
+      color: Color(0xFFED796B),
       city: MetroCity.shanghai,
     ),
     MetroLineInfo(
       num: 14,
       name: '14号线',
       nameEn: 'Line 14',
-      color: Color(0xFF4D3700),
+      color: Color(0xFFC76B00),
       city: MetroCity.shanghai,
     ),
     MetroLineInfo(
       num: 15,
       name: '15号线',
       nameEn: 'Line 15',
-      color: Color(0xFFBF83BC),
+      color: Color(0xFFF9E700),
       city: MetroCity.shanghai,
     ),
     MetroLineInfo(
       num: 16,
       name: '16号线',
       nameEn: 'Line 16',
-      color: Color(0xFF7D8B2F),
+      color: Color(0xFFD5A7A1),
       city: MetroCity.shanghai,
     ),
     MetroLineInfo(
       num: 17,
       name: '17号线',
       nameEn: 'Line 17',
-      color: Color(0xFF6D4C7D),
+      color: Color(0xFF6A357D),
       city: MetroCity.shanghai,
     ),
     MetroLineInfo(
       num: 18,
       name: '18号线',
       nameEn: 'Line 18',
-      color: Color(0xFFB75700),
+      color: Color(0xFF76A32D),
+      city: MetroCity.shanghai,
+    ),
+    MetroLineInfo(
+      num: 19,
+      name: '19号线',
+      nameEn: 'Line 19',
+      color: Color(0xFF00A9A9),
+      city: MetroCity.shanghai,
+    ),
+    MetroLineInfo(
+      num: 20,
+      name: '20号线',
+      nameEn: 'Line 20',
+      color: Color(0xFFD6ABC1),
+      city: MetroCity.shanghai,
+    ),
+    MetroLineInfo(
+      num: 21,
+      name: '21号线',
+      nameEn: 'Line 21',
+      color: Color(0xFFF7C8CE),
+      city: MetroCity.shanghai,
+    ),
+    MetroLineInfo(
+      num: 22,
+      name: '22号线',
+      nameEn: 'Line 22',
+      color: Color(0xFF35570B),
+      city: MetroCity.shanghai,
+    ),
+    MetroLineInfo(
+      num: 23,
+      name: '23号线',
+      nameEn: 'Line 23',
+      color: Color(0xFFE40077),
+      city: MetroCity.shanghai,
+    ),
+    MetroLineInfo(
+      num: 24,
+      name: '24号线',
+      nameEn: 'Line 24',
+      color: Color(0xFFE46022),
+      city: MetroCity.shanghai,
+    ),
+    MetroLineInfo(
+      num: 25,
+      name: '25号线',
+      nameEn: 'Line 25',
+      color: Color(0xFFE46022),
+      city: MetroCity.shanghai,
+    ),
+    MetroLineInfo(
+      num: 26,
+      name: '26号线',
+      nameEn: 'Line 26',
+      color: Color(0xFFB25921),
+      city: MetroCity.shanghai,
+    ),
+    MetroLineInfo(
+      num: 27,
+      name: '27号线',
+      nameEn: 'Line 27',
+      color: Color(0xFFDE82B2),
+      city: MetroCity.shanghai,
+    ),
+    MetroLineInfo(
+      num: 28,
+      name: '28号线',
+      nameEn: 'Line 28',
+      color: Color(0xFFE6081B),
+      city: MetroCity.shanghai,
+    ),
+    MetroLineInfo(
+      num: 29,
+      name: '29号线',
+      nameEn: 'Line 29',
+      color: Color(0xFFE6081B),
+      city: MetroCity.shanghai,
+    ),
+    MetroLineInfo(
+      num: 30,
+      name: '30号线',
+      nameEn: 'Line 30',
+      color: Color(0xFFA29BBB),
+      city: MetroCity.shanghai,
+    ),
+    MetroLineInfo(
+      num: 31,
+      name: '31号线',
+      nameEn: 'Line 31',
+      color: Color(0xFF004BA0),
       city: MetroCity.shanghai,
     ),
   ];
@@ -231,98 +336,77 @@ class MetroLineInfo {
       num: 1,
       name: '1号线',
       nameEn: 'Line 1',
-      color: Color(0xFFFFD200),
+      color: Color(0xFFF3D03E),
       city: MetroCity.guangzhou,
     ),
     MetroLineInfo(
       num: 2,
       name: '2号线',
       nameEn: 'Line 2',
-      color: Color(0xFF004F97),
+      color: Color(0xFF00629B),
       city: MetroCity.guangzhou,
     ),
     MetroLineInfo(
       num: 3,
       name: '3号线',
       nameEn: 'Line 3',
-      color: Color(0xFF963B6D),
+      color: Color(0xFFECA154),
       city: MetroCity.guangzhou,
     ),
     MetroLineInfo(
       num: 4,
       name: '4号线',
       nameEn: 'Line 4',
-      color: Color(0xFF009944),
+      color: Color(0xFF00843D),
       city: MetroCity.guangzhou,
     ),
     MetroLineInfo(
       num: 5,
       name: '5号线',
       nameEn: 'Line 5',
-      color: Color(0xFFAD5A00),
+      color: Color(0xFFC5003E),
       city: MetroCity.guangzhou,
     ),
     MetroLineInfo(
       num: 6,
       name: '6号线',
       nameEn: 'Line 6',
-      color: Color(0xFF944B84),
+      color: Color(0xFF80225F),
       city: MetroCity.guangzhou,
     ),
     MetroLineInfo(
       num: 7,
       name: '7号线',
       nameEn: 'Line 7',
-      color: Color(0xFFB85C00),
+      color: Color(0xFF97D700),
       city: MetroCity.guangzhou,
     ),
     MetroLineInfo(
       num: 8,
       name: '8号线',
       nameEn: 'Line 8',
-      color: Color(0xFF00A1DE),
+      color: Color(0xFF008C95),
       city: MetroCity.guangzhou,
     ),
     MetroLineInfo(
       num: 9,
       name: '9号线',
       nameEn: 'Line 9',
-      color: Color(0xFF838900),
+      color: Color(0xFF71CC98),
       city: MetroCity.guangzhou,
     ),
     MetroLineInfo(
       num: 13,
       name: '13号线',
       nameEn: 'Line 13',
-      color: Color(0xFFB75700),
+      color: Color(0xFF8E8C13),
       city: MetroCity.guangzhou,
     ),
     MetroLineInfo(
       num: 14,
       name: '14号线',
       nameEn: 'Line 14',
-      color: Color(0xFFCC6699),
-      city: MetroCity.guangzhou,
-    ),
-    MetroLineInfo(
-      num: 18,
-      name: '18号线',
-      nameEn: 'Line 18',
-      color: Color(0xFFB75700),
-      city: MetroCity.guangzhou,
-    ),
-    MetroLineInfo(
-      num: 21,
-      name: '21号线',
-      nameEn: 'Line 21',
-      color: Color(0xFF4DB749),
-      city: MetroCity.guangzhou,
-    ),
-    MetroLineInfo(
-      num: 22,
-      name: '22号线',
-      nameEn: 'Line 22',
-      color: Color(0xFF7D2E8D),
+      color: Color(0xFF81312F),
       city: MetroCity.guangzhou,
     ),
   ];
@@ -332,71 +416,137 @@ class MetroLineInfo {
       num: 1,
       name: '东铁线',
       nameEn: 'East Rail Line',
-      color: Color(0xFF76B7B5),
+      color: Color(0xFF007078),
       city: MetroCity.mtr,
     ),
     MetroLineInfo(
       num: 2,
       name: '荃湾线',
       nameEn: 'Tsuen Wan Line',
-      color: Color(0xFFFF2D2D),
+      color: Color(0xFFEFA540),
       city: MetroCity.mtr,
     ),
     MetroLineInfo(
       num: 3,
       name: '观塘线',
       nameEn: 'Kwun Tong Line',
-      color: Color(0xFF7ACB00),
+      color: Color(0xFF80CC28),
       city: MetroCity.mtr,
     ),
     MetroLineInfo(
       num: 4,
       name: '港岛线',
       nameEn: 'Island Line',
-      color: Color(0xFF0072CE),
+      color: Color(0xFF7D5BBD),
       city: MetroCity.mtr,
     ),
     MetroLineInfo(
       num: 5,
       name: '东涌线',
       nameEn: 'Tung Chung Line',
-      color: Color(0xFFFFA02F),
+      color: Color(0xFFF27E23),
       city: MetroCity.mtr,
     ),
     MetroLineInfo(
       num: 6,
       name: '迪士尼线',
       nameEn: 'Disneyland Resort Line',
-      color: Color(0xFFBC8F8F),
+      color: Color(0xFF1E6EB2),
       city: MetroCity.mtr,
     ),
     MetroLineInfo(
       num: 7,
       name: '南港岛线',
       nameEn: 'South Island Line',
-      color: Color(0xFFD5C62B),
+      color: Color(0xFFEE2C74),
       city: MetroCity.mtr,
     ),
     MetroLineInfo(
       num: 8,
       name: '将军澳线',
       nameEn: 'Tseung Kwan O Line',
-      color: Color(0xFF7B4998),
+      color: Color(0xFFED7B23),
       city: MetroCity.mtr,
     ),
     MetroLineInfo(
       num: 9,
       name: '机场快线',
       nameEn: 'Airport Express',
-      color: Color(0xFF0072CE),
+      color: Color(0xFFA74629),
       city: MetroCity.mtr,
     ),
     MetroLineInfo(
       num: 10,
       name: '屯马线',
       nameEn: 'Tuen Ma Line',
-      color: Color(0xFFAB5700),
+      color: Color(0xFF4CB05E),
       city: MetroCity.mtr,
+    ),
+    MetroLineInfo(
+      num: 11,
+      name: '高速铁路',
+      nameEn: 'High Speed Rail',
+      color: Color(0xFF961A1E),
+      city: MetroCity.mtr,
+    ),
+  ];
+
+  static const List<MetroLineInfo> jrLines = [
+    MetroLineInfo(
+      num: 1,
+      name: '山手线',
+      nameEn: 'Yamanote Line',
+      color: Color(0xFF7CC242),
+      city: MetroCity.jr,
+    ),
+    MetroLineInfo(
+      num: 2,
+      name: '中央线快速',
+      nameEn: 'Chuo Rapid Line',
+      color: Color(0xFFF15A22),
+      city: MetroCity.jr,
+    ),
+    MetroLineInfo(
+      num: 3,
+      name: '总武线',
+      nameEn: 'Sobu Line',
+      color: Color(0xFFFFD400),
+      city: MetroCity.jr,
+    ),
+    MetroLineInfo(
+      num: 4,
+      name: '京滨东北线',
+      nameEn: 'Keihin-Tohoku Line',
+      color: Color(0xFF00A7E3),
+      city: MetroCity.jr,
+    ),
+    MetroLineInfo(
+      num: 5,
+      name: '埼京线',
+      nameEn: 'Saikyo Line',
+      color: Color(0xFF00A040),
+      city: MetroCity.jr,
+    ),
+    MetroLineInfo(
+      num: 6,
+      name: '横须贺线',
+      nameEn: 'Yokosuka Line',
+      color: Color(0xFF1F2F6B),
+      city: MetroCity.jr,
+    ),
+    MetroLineInfo(
+      num: 7,
+      name: '京叶线',
+      nameEn: 'Keiyo Line',
+      color: Color(0xFFD40078),
+      city: MetroCity.jr,
+    ),
+    MetroLineInfo(
+      num: 8,
+      name: '南武线',
+      nameEn: 'Nambu Line',
+      color: Color(0xFFFFC20E),
+      city: MetroCity.jr,
     ),
   ];
 }
@@ -1281,6 +1431,10 @@ class MetroTemplatePresets {
             .where(
               (t) => t.city == MetroCity.mtr || t.city == MetroCity.shanghai,
             )
+            .toList();
+      case MetroCityStyle.jr:
+        return MetroTemplate._templates
+            .where((t) => t.city == MetroCity.shanghai)
             .toList();
     }
   }
