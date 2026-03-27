@@ -477,12 +477,12 @@ class RoadSignCanvas extends StatelessWidget {
                     onPanUpdate: (details) {
                       final maxX = width - node.width - 12;
                       final maxY = height - node.height - 12;
-                      final dx = details.delta.dx / interactionScale;
-                      final dy = details.delta.dy / interactionScale;
+                      final dx = details.delta.dx;
+                      final dy = details.delta.dy;
                       _replaceNode(
                         node.copyWith(
-                          x: (node.x + dx).clamp(0, maxX),
-                          y: (node.y + dy).clamp(0, maxY),
+                          x: (node.x + dx).clamp(0.0, maxX),
+                          y: (node.y + dy).clamp(0.0, maxY),
                         ),
                       );
                     },

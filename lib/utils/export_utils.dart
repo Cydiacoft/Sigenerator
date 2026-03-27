@@ -277,19 +277,33 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
     return Color(int.parse(hex, radix: 16));
   }
 
+  bool get _isLightColor {
+    final r = _selectedColor.r;
+    final g = _selectedColor.g;
+    final b = _selectedColor.b;
+    return (r * 0.299 + g * 0.587 + b * 0.114) > 0.5;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.title),
-      content: SizedBox(
-        width: 300,
+    final textColor = _isLightColor ? Colors.black : Colors.white;
+    
+    return Dialog(
+      backgroundColor: const Color(0xFF1E293B),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(widget.title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: _presetColors.map((color) {
+                final isSelected = _selectedColor.toARGB32() == color.toARGB32();
                 return GestureDetector(
                   onTap: () {
                     setState(() {
@@ -298,17 +312,22 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
                     });
                   },
                   child: Container(
-                    width: 40,
-                    height: 40,
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
                       color: color,
                       border: Border.all(
-                        color: _selectedColor == color
-                            ? Colors.white
-                            : Colors.transparent,
-                        width: 3,
+                        color: isSelected ? const Color(0xFF3B82F6) : Colors.white24,
+                        width: isSelected ? 3 : 1,
                       ),
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(6),
+                      boxShadow: isSelected ? [
+                        BoxShadow(
+                          color: const Color(0xFF3B82F6).withValues(alpha: 0.4),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                      ] : null,
                     ),
                   ),
                 );
@@ -317,10 +336,23 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
             const SizedBox(height: 20),
             TextField(
               controller: _hexController,
-              decoration: const InputDecoration(
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
                 labelText: 'HEX颜色值',
-                border: OutlineInputBorder(),
+                labelStyle: const TextStyle(color: Colors.white70),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Color(0xFF475569)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: const BorderSide(color: Color(0xFF3B82F6)),
+                ),
                 prefixText: '#',
+                prefixStyle: const TextStyle(color: Colors.white70),
+                filled: true,
+                fillColor: const Color(0xFF0F172A),
               ),
               onChanged: (value) {
                 try {
@@ -333,26 +365,52 @@ class _ColorPickerDialogState extends State<ColorPickerDialog> {
             const SizedBox(height: 20),
             Container(
               width: double.infinity,
-              height: 60,
+              height: 70,
               decoration: BoxDecoration(
                 color: _selectedColor,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.white),
+                border: Border.all(color: Colors.white54, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: _selectedColor.withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    spreadRadius: 2,
+                  ),
+                ],
               ),
+              child: Center(
+                child: Text(
+                  _colorToHex(_selectedColor),
+                  style: TextStyle(
+                    color: textColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('取消', style: TextStyle(color: Colors.white70)),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF3B82F6),
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () => Navigator.pop(context, _selectedColor),
+                  child: const Text('确认'),
+                ),
+              ],
             ),
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(context, _selectedColor),
-          child: const Text('确认'),
-        ),
-      ],
     );
   }
 }

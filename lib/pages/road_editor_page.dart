@@ -35,9 +35,10 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
   String? _selectedNodeId = 'item_center';
   TextNode? _clipboardNode;
   String? _projectFilePath;
-  double _leftPanelWidth = 360;
-  double _rightPanelWidth = 340;
+  double _leftPanelWidth = 260;
+  double _rightPanelWidth = 260;
   double _canvasZoom = 0.78;
+  int _rightPanelSection = 0;
 
   @override
   void initState() {
@@ -98,6 +99,7 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
           const SingleActivator(LogicalKeyboardKey.keyD, control: true):
               _duplicateSelectedNode,
           const SingleActivator(LogicalKeyboardKey.delete): _deleteSelectedNode,
+          const SingleActivator(LogicalKeyboardKey.escape): _deselectNode,
         },
         child: Focus(
           autofocus: true,
@@ -316,7 +318,7 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
       child: Column(
         children: [
           Container(
-            height: 52,
+            height: 44,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: const BoxDecoration(
               color: Color(0xFF111827),
@@ -344,13 +346,13 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
                 ),
                 const SizedBox(width: 8),
                 SizedBox(
-                  width: 220,
+                  width: 160,
                   child: Row(
                     children: [
                       const Icon(
                         Icons.zoom_out_map,
                         color: Colors.white38,
-                        size: 16,
+                        size: 14,
                       ),
                       Expanded(
                         child: SliderTheme(
@@ -373,7 +375,7 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
                         '${(_canvasZoom * 100).round()}%',
                         style: const TextStyle(
                           color: Colors.white60,
-                          fontSize: 12,
+                          fontSize: 11,
                         ),
                       ),
                     ],
@@ -383,52 +385,470 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
             ),
           ),
           Expanded(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: InteractiveViewer(
-                  transformationController: _canvasViewController,
-                  constrained: false,
-                  boundaryMargin: const EdgeInsets.all(240),
-                  minScale: 1,
-                  maxScale: 1,
-                  panEnabled: true,
-                  scaleEnabled: false,
-                  child: RepaintBoundary(
-                    key: _boardKey,
-                    child: Transform.scale(
-                      scale: _canvasZoom,
-                      alignment: Alignment.topCenter,
-                      child: RoadSignCanvas(
-                        width: _template.canvasSize.width,
-                        height: _template.canvasSize.height,
-                        backgroundColor: _scene.backgroundColor,
-                        borderColor: _scene.foregroundColor,
-                        borderWidth: 2,
-                        nodes: nodes,
-                        selectedNodeId: _selectedNodeId,
-                        onNodeSelected: (id) =>
-                            setState(() => _selectedNodeId = id),
-                        onNodeSecondaryTapDown: _showNodeContextMenu,
-                        onNodesChanged: _onBoardChanged,
-                        interactionScale: _canvasZoom,
-                      ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 36,
+                    height: _template.canvasSize.height * _canvasZoom + 28,
+                    child: _buildVerticalRuler(),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          height: 28,
+                          child: _buildHorizontalRuler(),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              if (_selectedNodeId != null) {
+                                setState(() => _selectedNodeId = null);
+                              }
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1E293B),
+                                border: Border.all(color: const Color(0xFF475569)),
+                              ),
+                              child: InteractiveViewer(
+                                transformationController: _canvasViewController,
+                                constrained: false,
+                                boundaryMargin: const EdgeInsets.all(240),
+                                minScale: 1,
+                                maxScale: 1,
+                                panEnabled: true,
+                                scaleEnabled: false,
+                                child: RepaintBoundary(
+                                  key: _boardKey,
+                                  child: Transform.scale(
+                                    scale: _canvasZoom,
+                                    alignment: Alignment.topLeft,
+                                    child: RoadSignCanvas(
+                                      width: _template.canvasSize.width,
+                                      height: _template.canvasSize.height,
+                                      backgroundColor: _scene.backgroundColor,
+                                      borderColor: _scene.foregroundColor,
+                                      borderWidth: 2,
+                                      nodes: nodes,
+                                      selectedNodeId: _selectedNodeId,
+                                      onNodeSelected: (id) =>
+                                          setState(() => _selectedNodeId = id),
+                                      onNodeSecondaryTapDown: _showNodeContextMenu,
+                                      onNodesChanged: _onBoardChanged,
+                                      interactionScale: _canvasZoom,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
-          if (selected != null)
-            Container(
-              height: 172,
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                color: Color(0xFF111827),
-                border: Border(top: BorderSide(color: Color(0xFF1F2937))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRuler() {
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildVerticalRuler() {
+    return Container(
+      width: 36,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        border: Border(
+          right: BorderSide(
+            color: const Color(0xFF334155).withValues(alpha: 0.8),
+            width: 1,
+          ),
+        ),
+      ),
+      child: CustomPaint(
+        painter: _VerticalRulerPainter(
+          canvasHeight: _template.canvasSize.height,
+          zoom: _canvasZoom,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHorizontalRuler() {
+    return Container(
+      height: 28,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        border: Border(
+          bottom: BorderSide(
+            color: const Color(0xFF334155).withValues(alpha: 0.8),
+            width: 1,
+          ),
+        ),
+      ),
+      child: CustomPaint(
+        painter: _HorizontalRulerPainter(
+          canvasWidth: _template.canvasSize.width,
+          zoom: _canvasZoom,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomPosition(TextNode? node) {
+    if (node == null) {
+      return const Center(
+        child: Text('请先选择一个元素', style: TextStyle(color: Colors.white38)),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _positionInput('X', node.x, (v) => _updateNodePosition(node, v, null)),
               ),
-              child: _buildSelectedSummary(selected),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _positionInput('Y', node.y, (v) => _updateNodePosition(node, null, v)),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _positionInput('宽', node.width, (v) => _updateNodeSize(node, v, null)),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _positionInput('高', node.height, (v) => _updateNodeSize(node, null, v)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              const Text('对齐: ', style: TextStyle(color: Colors.white54, fontSize: 11)),
+              const SizedBox(width: 8),
+              ChoiceChip(
+                label: const Text('左', style: TextStyle(fontSize: 10)),
+                selected: node.textAlign == TextAlign.left,
+                onSelected: (_) => _updateSelected(node.copyWith(textAlign: TextAlign.left)),
+              ),
+              const SizedBox(width: 4),
+              ChoiceChip(
+                label: const Text('中', style: TextStyle(fontSize: 10)),
+                selected: node.textAlign == TextAlign.center,
+                onSelected: (_) => _updateSelected(node.copyWith(textAlign: TextAlign.center)),
+              ),
+              const SizedBox(width: 4),
+              ChoiceChip(
+                label: const Text('右', style: TextStyle(fontSize: 10)),
+                selected: node.textAlign == TextAlign.right,
+                onSelected: (_) => _updateSelected(node.copyWith(textAlign: TextAlign.right)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _positionInput(String label, double value, ValueChanged<double> onChanged) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 24,
+          child: Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+        ),
+        Expanded(
+          child: SizedBox(
+            height: 32,
+            child: TextField(
+              controller: TextEditingController(text: value.round().toString()),
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                filled: true,
+                fillColor: const Color(0xFF1E293B),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(4),
+                  borderSide: const BorderSide(color: Color(0xFF475569)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(4),
+                  borderSide: const BorderSide(color: Color(0xFF3B82F6)),
+                ),
+              ),
+              onSubmitted: (v) {
+                final parsed = double.tryParse(v);
+                if (parsed != null) onChanged(parsed);
+              },
             ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBottomStyle(TextNode? node) {
+    if (node == null) {
+      return const Center(
+        child: Text('请先选择一个元素', style: TextStyle(color: Colors.white38)),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('填充颜色', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  children: [
+                    _colorSwatch(Colors.white, node.fillColor, (c) => _updateSelected(node.copyWith(fillColor: c))),
+                    _colorSwatch(const Color(0xFF20308E), node.fillColor, (c) => _updateSelected(node.copyWith(fillColor: c))),
+                    _colorSwatch(const Color(0xFF8B5A2B), node.fillColor, (c) => _updateSelected(node.copyWith(fillColor: c))),
+                    _colorSwatch(Colors.black, node.fillColor, (c) => _updateSelected(node.copyWith(fillColor: c))),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('边框颜色', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  children: [
+                    _colorSwatch(Colors.transparent, node.borderColor, (c) => _updateSelected(node.copyWith(borderColor: c))),
+                    _colorSwatch(Colors.white, node.borderColor, (c) => _updateSelected(node.copyWith(borderColor: c))),
+                    _colorSwatch(const Color(0xFF20308E), node.borderColor, (c) => _updateSelected(node.copyWith(borderColor: c))),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('边框宽度', style: TextStyle(color: Colors.white54, fontSize: 11)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Slider(
+                        value: (node.borderWidth ?? 0).toDouble(),
+                        min: 0,
+                        max: 8,
+                        onChanged: (v) => _updateSelected(node.copyWith(borderWidth: v)),
+                      ),
+                    ),
+                    Text('${node.borderWidth ?? 0}', style: const TextStyle(color: Colors.white60, fontSize: 11)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _colorSwatch(Color color, Color? current, ValueChanged<Color> onSelected) {
+    final isSelected = current?.toARGB32() == color.toARGB32();
+    return InkWell(
+      onTap: () => onSelected(color),
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF3B82F6) : Colors.white24,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomText(TextNode? node) {
+    if (node == null) {
+      return const Center(
+        child: Text('请先选择一个元素', style: TextStyle(color: Colors.white38)),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('中文内容', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 40,
+                  child: TextField(
+                    controller: TextEditingController(text: node.text),
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                      filled: true,
+                      fillColor: const Color(0xFF1E293B),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: const BorderSide(color: Color(0xFF475569)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: const BorderSide(color: Color(0xFF3B82F6)),
+                      ),
+                    ),
+                    onSubmitted: (v) => _updateSelected(node.copyWith(text: v)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('英文内容', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 40,
+                  child: TextField(
+                    controller: TextEditingController(text: node.textEn ?? ''),
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                      filled: true,
+                      fillColor: const Color(0xFF1E293B),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: const BorderSide(color: Color(0xFF475569)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: const BorderSide(color: Color(0xFF3B82F6)),
+                      ),
+                    ),
+                    onSubmitted: (v) => _updateSelected(node.copyWith(textEn: v)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('字号', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 40,
+                  child: TextField(
+                    controller: TextEditingController(text: node.style.fontSize?.round().toString() ?? '24'),
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                      filled: true,
+                      fillColor: const Color(0xFF1E293B),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: const BorderSide(color: Color(0xFF475569)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: const BorderSide(color: Color(0xFF3B82F6)),
+                      ),
+                    ),
+                    onSubmitted: (v) {
+                      final parsed = double.tryParse(v);
+                      if (parsed != null) {
+                        _updateSelected(node.copyWith(style: node.style.copyWith(fontSize: parsed)));
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomLayer(TextNode? node) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('图层操作', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ActionChip(
+                avatar: const Icon(Icons.flip_to_front, size: 14),
+                label: const Text('置于顶层', style: TextStyle(fontSize: 11)),
+                onPressed: node != null ? () => _moveNodeLayer(node.id, bringToFront: true) : null,
+              ),
+              ActionChip(
+                avatar: const Icon(Icons.flip_to_back, size: 14),
+                label: const Text('置于底层', style: TextStyle(fontSize: 11)),
+                onPressed: node != null ? () => _moveNodeLayer(node.id, bringToFront: false) : null,
+              ),
+              ActionChip(
+                avatar: const Icon(Icons.content_copy, size: 14),
+                label: const Text('复制副本', style: TextStyle(fontSize: 11)),
+                onPressed: _duplicateSelectedNode,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            '当前方向元素数量: ${_boards[_activeDirection]!.length}',
+            style: const TextStyle(color: Colors.white38, fontSize: 11),
+          ),
         ],
       ),
     );
@@ -441,43 +861,371 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
         color: Color(0xFF111827),
         border: Border(left: BorderSide(color: Color(0xFF1F2937))),
       ),
-      child: ListView(
-        padding: const EdgeInsets.all(20),
+      child: Column(
         children: [
-          _sectionTitle('快捷元素', '白底、棕底和路口图形'),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              ActionChip(
-                label: const Text('添加白底子牌'),
-                onPressed: _addWhitePlate,
-              ),
-              ActionChip(
-                label: const Text('添加棕底子牌'),
-                onPressed: _addScenicPlate,
-              ),
-              ActionChip(
-                label: const Text('添加路口图形'),
-                onPressed: _addGraphicNode,
-              ),
-              ActionChip(
-                label: const Text('重置当前方向'),
-                onPressed: () => setState(() {
-                  _boards[_activeDirection] = _buildBoard(_activeDirection);
-                  _selectedNodeId = 'item_center';
-                }),
-              ),
-            ],
+          Container(
+            height: 40,
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: Color(0xFF1F2937))),
+            ),
+            child: Row(
+              children: [
+                _rightTabButton('属性', 0),
+                _rightTabButton('元素', 1),
+                _rightTabButton('预览', 2),
+              ],
+            ),
           ),
-          const SizedBox(height: 24),
-          _sectionTitle('四向预览', '点击预览切换当前编辑方向'),
-          const SizedBox(height: 12),
-          ..._dirs.map(_buildPreviewCard),
+          Expanded(
+            child: _rightPanelSection == 0
+                ? _buildPropertyPanel()
+                : _rightPanelSection == 1
+                    ? _buildElementsPanel()
+                    : _buildPreviewPanel(),
+          ),
         ],
       ),
     );
+  }
+
+  Widget _rightTabButton(String label, int index) {
+    final selected = _rightPanelSection == index;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _rightPanelSection = index),
+        child: Container(
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? const Color(0xFF3B82F6) : Colors.white54,
+              fontSize: 12,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildElementsPanel() {
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        _sectionTitle('快捷操作', '快速添加元素'),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            ActionChip(
+              label: const Text('白底子牌', style: TextStyle(fontSize: 11)),
+              onPressed: _addWhitePlate,
+            ),
+            ActionChip(
+              label: const Text('棕底子牌', style: TextStyle(fontSize: 11)),
+              onPressed: _addScenicPlate,
+            ),
+            ActionChip(
+              label: const Text('路口图形', style: TextStyle(fontSize: 11)),
+              onPressed: _addGraphicNode,
+            ),
+            ActionChip(
+              label: const Text('重置方向', style: TextStyle(fontSize: 11)),
+              onPressed: () => setState(() {
+                _boards[_activeDirection] = _buildBoard(_activeDirection);
+                _selectedNodeId = 'item_center';
+              }),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _sectionTitle('当前元素', '点击选择'),
+        const SizedBox(height: 8),
+        ..._boards[_activeDirection]!.map(_buildElementItem),
+      ],
+    );
+  }
+
+  Widget _buildPreviewPanel() {
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        _sectionTitle('四向预览', '点击切换方向'),
+        const SizedBox(height: 8),
+        ..._dirs.map(_buildPreviewCard),
+      ],
+    );
+  }
+
+  Widget _buildPropertyPanel() {
+    final node = _selectedNode(_boards[_activeDirection]!);
+    if (node == null) {
+      return const Center(
+        child: Text(
+          '请在画布上选择一个元素',
+          style: TextStyle(color: Colors.white54),
+        ),
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        _propertySection('基本信息', [
+          _propertyRow('编号', node.id),
+          _propertyRow('类型', node.nodeType.name),
+          _propertyRow('插槽', node.slotId ?? '-'),
+        ]),
+        const SizedBox(height: 12),
+        _propertySection('文字内容', [
+          _textField('中文', node, 'text', key: ValueKey('${node.id}_text')),
+          const SizedBox(height: 8),
+          _textField('英文', node, 'textEn', key: ValueKey('${node.id}_textEn')),
+        ]),
+        const SizedBox(height: 12),
+        _propertySection('位置与尺寸', [
+          _propertySlider('X', node.x, 0, 600, (v) => _updateNodePosition(node, v, null)),
+          _propertySlider('Y', node.y, 0, 400, (v) => _updateNodePosition(node, null, v)),
+          _propertySlider('宽', node.width, 50, 400, (v) => _updateNodeSize(node, v, null)),
+          _propertySlider('高', node.height, 30, 300, (v) => _updateNodeSize(node, null, v)),
+        ]),
+        const SizedBox(height: 12),
+        _propertySection('对齐', [
+          Wrap(
+            spacing: 6,
+            children: [
+              _alignChip(node, TextAlign.left, '左'),
+              _alignChip(node, TextAlign.center, '中'),
+              _alignChip(node, TextAlign.right, '右'),
+            ],
+          ),
+        ]),
+        const SizedBox(height: 12),
+        _propertySection('操作', [
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              ActionChip(
+                label: const Text('复制', style: TextStyle(fontSize: 11)),
+                onPressed: _copySelectedNode,
+              ),
+              ActionChip(
+                label: const Text('删除', style: TextStyle(fontSize: 11)),
+                onPressed: _deleteSelectedNode,
+              ),
+              ActionChip(
+                label: const Text('取消选中', style: TextStyle(fontSize: 11)),
+                onPressed: _deselectNode,
+              ),
+            ],
+          ),
+        ]),
+      ],
+    );
+  }
+
+  final Map<String, TextEditingController> _textControllers = {};
+
+  void _disposeControllers(String nodeId) {
+    _textControllers.remove('$nodeId\_text')?.dispose();
+    _textControllers.remove('$nodeId\_textEn')?.dispose();
+  }
+
+  TextEditingController _getController(String nodeId, String field, String initialValue) {
+    final key = '${nodeId}_$field';
+    if (!_textControllers.containsKey(key)) {
+      _textControllers[key] = TextEditingController(text: initialValue);
+    } else {
+      final controller = _textControllers[key]!;
+      if (controller.text != initialValue) {
+        controller.text = initialValue;
+      }
+    }
+    return _textControllers[key]!;
+  }
+
+  Widget _textField(String label, TextNode node, String field, {Key? key}) {
+    final value = field == 'text' ? node.text : (node.textEn ?? '');
+    final controller = _getController(node.id, field, value);
+    return TextField(
+      key: key,
+      controller: controller,
+      style: const TextStyle(color: Colors.white, fontSize: 13),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+        filled: true,
+        fillColor: const Color(0xFF1E293B),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: Color(0xFF475569)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(6),
+          borderSide: const BorderSide(color: Color(0xFF3B82F6)),
+        ),
+      ),
+      onChanged: (v) {
+        if (field == 'text') {
+          _updateSelected(node.copyWith(text: v));
+        } else {
+          _updateSelected(node.copyWith(textEn: v));
+        }
+      },
+    );
+  }
+
+  Widget _propertySection(String title, List<Widget> children) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 10),
+        ...children,
+      ],
+    );
+  }
+
+  Widget _propertyRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 60,
+            child: Text(
+              label,
+              style: const TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _propertySlider(String label, double value, double min, double max, ValueChanged<double> onChanged) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 40,
+            child: Text(
+              label,
+              style: const TextStyle(color: Colors.white54, fontSize: 11),
+            ),
+          ),
+          Expanded(
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 2,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+              ),
+              child: Slider(
+                value: value.clamp(min, max),
+                min: min,
+                max: max,
+                onChanged: onChanged,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 40,
+            child: Text(
+              value.round().toString(),
+              style: const TextStyle(color: Colors.white60, fontSize: 11),
+              textAlign: TextAlign.right,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildElementItem(TextNode node) {
+    final isSelected = node.id == _selectedNodeId;
+    return InkWell(
+      onTap: () => setState(() => _selectedNodeId = node.id),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF3B82F6) : const Color(0xFF1F2937),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 4,
+              height: 32,
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xFF3B82F6) : Colors.transparent,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    node.slotId ?? node.id,
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                  Text(
+                    node.nodeType.name,
+                    style: const TextStyle(color: Colors.white38, fontSize: 10),
+                  ),
+                ],
+              ),
+            ),
+            if (node.fillColor != null)
+              Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: node.fillColor,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _updateNodePosition(TextNode node, double? x, double? y) {
+    _updateSelected(node.copyWith(
+      x: x ?? node.x,
+      y: y ?? node.y,
+    ));
+  }
+
+  void _updateNodeSize(TextNode node, double? w, double? h) {
+    _updateSelected(node.copyWith(
+      width: w ?? node.width,
+      height: h ?? node.height,
+    ));
   }
 
   Widget _buildDirectionEditor(String dir) {
@@ -571,49 +1319,6 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
     );
   }
 
-  Widget _buildSelectedSummary(TextNode node) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '当前选中：${node.slotId ?? node.id}',
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          node.nodeType == NodeType.graphic
-              ? '当前是路口图形元素，可在左侧修改路口形状，或在右侧继续添加新的图形。'
-              : '拖拽命中区已经放大，按住文字块或子牌周围的高亮框即可移动元素。',
-          style: const TextStyle(color: Colors.white60, fontSize: 12),
-        ),
-        if (node.nodeType != NodeType.graphic) ...[
-          const SizedBox(height: 14),
-          const Text(
-            '鏂囧瓧瀵归綈',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _alignChip(node, TextAlign.left, '居左'),
-              _alignChip(node, TextAlign.center, '居中'),
-              _alignChip(node, TextAlign.right, '居右'),
-            ],
-          ),
-        ],
-      ],
-    );
-  }
-
   Widget _alignChip(TextNode node, TextAlign align, String label) {
     return ChoiceChip(
       label: Text(label),
@@ -685,7 +1390,7 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
     final color = await showDialog<Color>(
       context: context,
       builder: (context) =>
-          ColorPickerDialog(initialColor: initial, title: '閫夋嫨$label'),
+          ColorPickerDialog(initialColor: initial, title: '选择$label'),
     );
     if (color != null) onChanged(color);
   }
@@ -775,6 +1480,15 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
       _selectedNodeId = duplicate.id;
     });
     _showMessage('已复制一个副本');
+  }
+
+  void _deselectNode() {
+    if (_selectedNodeId != null) {
+      _disposeControllers(_selectedNodeId!);
+    }
+    setState(() {
+      _selectedNodeId = null;
+    });
   }
 
   void _deleteSelectedNode() {
@@ -1163,7 +1877,7 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
       slotId: slotId,
       width: slot.rect.width,
       height: slot.rect.height,
-      text: info.roadName.isEmpty ? '閬撹矾鍚嶇О' : info.roadName,
+      text: info.roadName.isEmpty ? '道路名称' : info.roadName,
       textEn: info.roadNameEn,
       style: TextStyle(
         color: _scene.foregroundColor,
@@ -1187,7 +1901,7 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
       slotId: slotId,
       width: slot.rect.width,
       height: slot.rect.height,
-      text: info.destination.isEmpty ? '鍦扮偣鍚嶇О' : info.destination,
+      text: info.destination.isEmpty ? '地点名称' : info.destination,
       textEn: info.destinationEn,
       nodeType: NodeType.whiteBox,
       fillColor: scenic ? _scene.scenicColor : Colors.white,
@@ -1382,5 +2096,107 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
       'west' => 'east',
       _ => 'south',
     };
+  }
+}
+
+class _HorizontalRulerPainter extends CustomPainter {
+  final double canvasWidth;
+  final double zoom;
+
+  _HorizontalRulerPainter({required this.canvasWidth, required this.zoom});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final tickPaint = Paint()
+      ..color = const Color(0xFF64748B)
+      ..strokeWidth = 1;
+
+    final majorTickPaint = Paint()
+      ..color = const Color(0xFF94A3B8)
+      ..strokeWidth = 1;
+
+    final textStyle = const TextStyle(
+      color: Color(0xFFE2E8F0),
+      fontSize: 10,
+      fontWeight: FontWeight.w500,
+    );
+
+    const step = 50;
+
+    for (double x = 0; x <= canvasWidth; x += step) {
+      final dx = x * zoom;
+      final isMajor = x % 100 == 0;
+      
+      canvas.drawLine(
+        Offset(dx, isMajor ? 0 : size.height * 0.4),
+        Offset(dx, size.height),
+        isMajor ? majorTickPaint : tickPaint,
+      );
+      
+      if (isMajor && x > 0) {
+        final textSpan = TextSpan(text: x.toInt().toString(), style: textStyle);
+        final textPainter = TextPainter(
+          text: textSpan,
+          textDirection: TextDirection.ltr,
+        )..layout();
+        textPainter.paint(canvas, Offset(dx - textPainter.width / 2, 2));
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _HorizontalRulerPainter oldDelegate) {
+    return oldDelegate.canvasWidth != canvasWidth || oldDelegate.zoom != zoom;
+  }
+}
+
+class _VerticalRulerPainter extends CustomPainter {
+  final double canvasHeight;
+  final double zoom;
+
+  _VerticalRulerPainter({required this.canvasHeight, required this.zoom});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final tickPaint = Paint()
+      ..color = const Color(0xFF64748B)
+      ..strokeWidth = 1;
+
+    final majorTickPaint = Paint()
+      ..color = const Color(0xFF94A3B8)
+      ..strokeWidth = 1;
+
+    final textStyle = const TextStyle(
+      color: Color(0xFFE2E8F0),
+      fontSize: 10,
+      fontWeight: FontWeight.w500,
+    );
+
+    const step = 50;
+
+    for (double y = 0; y <= canvasHeight; y += step) {
+      final dy = y * zoom;
+      final isMajor = y % 100 == 0;
+      
+      canvas.drawLine(
+        Offset(0, dy),
+        Offset(isMajor ? size.width : size.width * 0.6, dy),
+        isMajor ? majorTickPaint : tickPaint,
+      );
+      
+        if (isMajor && y > 0) {
+        final textSpan = TextSpan(text: y.toInt().toString(), style: textStyle);
+        final textPainter = TextPainter(
+          text: textSpan,
+          textDirection: TextDirection.ltr,
+        )..layout();
+        textPainter.paint(canvas, Offset(2, dy - textPainter.height / 2));
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_VerticalRulerPainter oldDelegate) {
+    return oldDelegate.canvasHeight != canvasHeight || oldDelegate.zoom != zoom;
   }
 }
