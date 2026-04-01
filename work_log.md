@@ -159,3 +159,153 @@
 - Restored visible Chinese labels across the main road-editor toolbar, side panels, selection panel, and in-canvas edit dialog where mojibake had leaked in.
 - Added a quick `重置视图` action for the road-board workspace so panned canvases can snap back to a predictable working position.
 - Kept the project at a fully green analyzer state after the road editor refactor.
+- Reworked the ruler stack toward a data-driven viewport model:
+  - added `lib/models/road_canvas_viewport.dart` as the single source for zoom/pan-to-world conversion
+  - added `lib/widgets/road_ruler_strip.dart` to render PS-style horizontal/vertical rulers from viewport data
+  - rulers now track real board pan offset and show negative/positive coordinates instead of static fixed ticks
+- Added a top-left ruler origin corner marker to make the board origin relationship explicit.
+- Replaced focus-fragile shortcut wiring with global key handling in the road editor:
+  - `Ctrl+C`
+  - `Ctrl+V`
+  - `Ctrl+D`
+  - `Delete`
+  - `Esc`
+- Kept text-edit fields safe by skipping global shortcut interception while `EditableText` has focus.
+
+## 2026-03-29
+
+### Road Editor Stability and PS-Style Interaction
+
+- Fixed the previously broken-string risk in the road editor by restoring the page to a clean parseable state and re-running analyzer verification.
+- Added repository-level encoding guard files:
+  - `.editorconfig` with UTF-8 + LF defaults
+  - `.gitattributes` text normalization
+- Added `scripts/check_utf8_and_analyze.ps1` for strict UTF-8 decode checks plus `flutter analyze --no-pub`.
+- Replaced old static ruler painters with the new data-driven ruler strip stack:
+  - `lib/models/road_canvas_viewport.dart`
+  - `lib/widgets/road_ruler_strip.dart`
+- Added draggable guides from rulers and in-canvas guide overlays:
+  - horizontal guide drag from left ruler
+  - vertical guide drag from top ruler
+  - draft guide preview during drag
+  - one-click clear guides action
+- Added guide snap logic for selected non-graphic elements (left/top/center alignment snap).
+- Tightened node bounds behavior:
+  - dynamic X/Y range based on current node size and board size
+  - width/height clamping to board bounds
+  - auto-clamp after size changes
+- Added numeric direct input beside property sliders (custom value entry + clamp).
+- Fixed text element interaction hit-box sizing so text selection/drag boxes no longer feel oversized.
+- Replaced known mojibake leftovers in road-editor UI strings (plate defaults and export toasts).
+
+### Verification
+
+- `flutter analyze --no-pub lib/pages/road_editor_page.dart lib/widgets/road_sign_canvas.dart lib/models/road_canvas_viewport.dart lib/widgets/road_ruler_strip.dart`
+- Result: `No issues found!`
+
+### Road Editor Generator-Style Expansion (GB)
+
+- Added a generator-style control block in the road editor left panel to match the requested workflow:
+  - top mode tabs (`综合标志 / 地点距离 / 服务区距离 / 道路编号 / 自由编辑`)
+  - sign-type selector chips (left/right/straight/lane-guide variants)
+  - GB board color presets (`绿色 / 蓝色 / 棕色`)
+  - board opacity control (`0.5 ~ 1.0`)
+  - utility toggles (`出口距离` and `顶部信息栏`) with on-canvas node injection/removal
+  - text-row editing tools (move/copy/type/main-text/english-line/add-row/add-element/delete-row)
+- Added `应用 GB 标准预设` action:
+  - normalizes core board colors and text styles
+  - constrains center graphic sizes
+  - enforces stronger white-on-color / color-on-white contrast defaults
+- Added bottom quick actions in canvas workspace:
+  - `下载到本地` (PNG export)
+  - `复制到剪贴板` (copies exported PNG path)
+- Kept analyzer clean after this integration.
+
+### Road Editor Scenario Layer + Ruler Alignment Fix
+
+- Clarified and implemented the two-layer model in editor behavior:
+  - base layer: crossroad visual board editing
+  - scenario layer: mode-driven fine-grained controls (`综合标志 / 地点距离 / 服务区距离 / 道路编号 / 自由编辑`)
+- Linked scenario tabs to real canvas behavior (not only visual tab switching):
+  - mode selection now drives utility blocks and sign-type defaults
+  - sign type now maps into center graphic behavior (`crossroad / skewLeft / skewRight`)
+- Fixed severe ruler/guide misalignment by unifying coordinate origins:
+  - introduced content-origin offsets into viewport transform
+  - aligned ruler conversion, guide dragging, and guide overlay drawing to the same board-content origin
+  - set `InteractiveViewer` alignment to `Alignment.topLeft` to remove implicit offset drift
+- Preserved analyzer-green state after integration.
+
+### Scenario Integration Follow-up
+
+- Upgraded scenario tabs from single-direction toggles to whole-board-set presets:
+  - mode selection now applies across all four directions
+  - sign type mapping now updates center graphic for every direction board
+- Added scenario-specific content presets:
+  - `地点距离`: exit-distance utility defaults
+  - `服务区距离`: service-area styled bottom plates + utility info
+  - `道路编号`: top route-number style utility info
+- Ensured color changes (`绿色/蓝色/棕色`) keep current scenario preset behavior instead of resetting into an unrelated state.
+
+### Scenario-Specific Template Switch (Requested Behavior)
+
+- Refactored road template model to support multiple independent board templates instead of a single crossroad template:
+  - `standard_crossroad`
+  - `place_distance`
+  - `service_distance`
+  - `route_number`
+  - `free_compose`
+- Added template registry and lookup in `lib/models/road_board_template.dart` (`all`, `byId`, per-template id constants).
+- Updated road editor runtime to use an active template id rather than a fixed compile-time template:
+  - scene tab click now switches template id first, then applies scenario preset
+  - board rebuild now uses the currently selected scenario template
+  - project open now restores `templateId` and maps it back to the correct scenario tab
+- This makes “十字路口” one concrete template case under the scenario system, not the global default for every mode.
+
+### Reference-Driven Scenario Editor Expansion
+
+- Updated scenario tabs to align with the referenced workflows:
+  - `综合标志`
+  - `地点距离`
+  - `服务区距离`
+  - `服务区和停车区预告`
+  - `道路编号和命名编号`
+  - `自由编辑模式`
+- Added dedicated scenario editing forms in the left panel for:
+  - place-distance name + km + english line
+  - service-distance/service-advance name + km + english line + icon toggles
+  - route-number class + main code + branch code + alias
+- Added independent scenario template id `service_advance` and wired it into tab-template mapping.
+- Implemented template-specific board builders for:
+  - place distance
+  - service distance / service advance
+  - route number
+  - free compose (crossroad base)
+- All scenario inputs now rebuild their corresponding template output board directly (data-driven).
+
+### Remove Crossroad Mode (Requested)
+
+- Removed crossroad as a standalone scenario entry from the top scenario tabs.
+- Merged the original crossroad-oriented control set into `自由编辑模式` only.
+- Hid the old bottom crossroad configuration block in non-free modes, so it no longer appears under other scenario editors.
+- Updated default/new-project scenario to `自由编辑模式` and mapped legacy `standard_crossroad` project files to free-edit tab on open.
+
+### Top Bar Layout Switcher (VS Code Style)
+
+- Replaced old panel toggle buttons in the top toolbar with a VS Code style layout switcher.
+- Added four layout presets:
+  - left + center
+  - center only
+  - center + right
+  - left + center + right
+- Added visual active-state highlight and linked each preset to left/right panel visibility.
+
+## 2026-04-01
+
+### Ruler Layout and Alignment Fix
+
+- Fixed vertical ruler container clipping and visual misalignment:
+  - Replaced the `Row` wrapper in `_buildCanvasPanel` with a strict `Column(Row, Row)` grid structure.
+  - Added a `36x28` top-left corner spacer so the vertical ruler origin matches the exact Y-offset as the `InteractiveViewer` content.
+  - Removed the hardcoded constraint on the vertical ruler and used `CrossAxisAlignment.stretch`, allowing it to expand gracefully into the underlying remaining height without mid-screen truncation.
+- Verified that viewport coordinate mappings (`worldFromScreen` and `screenFromWorld`) properly intercept viewport offsets and translate faithfully into visual guide drags.
+- Guaranteed `flutter analyze --no-pub` remains green under `lib/pages/road_editor_page.dart`.

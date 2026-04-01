@@ -7,10 +7,14 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/intersection_scene.dart';
+import '../models/road_canvas_viewport.dart';
 import '../models/road_board_document.dart';
 import '../models/road_board_template.dart';
 import '../utils/export_utils.dart';
+import '../widgets/road_ruler_strip.dart';
 import '../widgets/road_sign_canvas.dart';
+
+enum _WorkbenchLayoutPreset { leftOnly, centerOnly, rightOnly, both }
 
 class RoadEditorPage extends StatefulWidget {
   const RoadEditorPage({super.key});
@@ -20,13 +24,34 @@ class RoadEditorPage extends StatefulWidget {
 }
 
 class _RoadEditorPageState extends State<RoadEditorPage> {
-  static const RoadBoardTemplateSpec _template =
-      RoadBoardTemplates.standardCrossroad;
   static const List<String> _dirs = ['north', 'east', 'south', 'west'];
+  static const List<String> _topTabs = <String>[
+    '地点距离',
+    '服务区距离',
+    '服务区和停车区预告',
+    '道路编号和命名编号',
+    '自由编辑模式',
+  ];
+  static const List<String> _signTypes = <String>[
+    '自由模式',
+    '左出口↖',
+    '左出口↑',
+    '直行↑',
+    '车道指引↓',
+    '右出口↗',
+    '右出口↑',
+  ];
+  static const Map<String, Color> _gbBoardColors = <String, Color>{
+    '绿色': Color(0xFF007A22),
+    '蓝色': Color(0xFF20308E),
+    '棕色': Color(0xFF8B5A2B),
+  };
+  static const double _boardContentInset = 6.0;
 
   final GlobalKey _boardKey = GlobalKey();
   final TransformationController _canvasViewController =
       TransformationController();
+  final FocusNode _editorFocusNode = FocusNode();
 
   late IntersectionScene _scene;
   late Map<String, List<TextNode>> _boards;
@@ -37,12 +62,55 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
   String? _projectFilePath;
   double _leftPanelWidth = 260;
   double _rightPanelWidth = 260;
+  bool _showLeftPanel = true;
+  bool _showRightPanel = true;
+  _WorkbenchLayoutPreset _layoutPreset = _WorkbenchLayoutPreset.both;
+  bool _enableCrossroadMode = false;
   double _canvasZoom = 0.78;
+  Offset _canvasPanOffset = Offset.zero;
+  final List<double> _verticalGuides = <double>[];
+  final List<double> _horizontalGuides = <double>[];
+  double? _draftVerticalGuide;
+  double? _draftHorizontalGuide;
   int _rightPanelSection = 0;
+  String _activeTopTab = '自由编辑模式';
+  String _activeSignType = '车道指引↓';
+  String _activeBoardColor = '蓝色';
+  double _boardOpacity = 1.0;
+  bool _showExitDistance = false;
+  bool _showTopInfoBar = false;
+  bool _showEnglishLine = true;
+  String _selectedElementKind = '文本';
+  String _activeTemplateId = RoadBoardTemplates.freeComposeId;
+  String _placeName = '南通';
+  bool _placePrefixIcon = false;
+  bool _placeSuffixIcon = false;
+  String _placeDistanceKm = '23';
+  bool _placeIncludeEnglish = false;
+  String _serviceName = '先锋';
+  String _serviceDistanceKm = '1.5';
+  bool _serviceIncludeEnglish = false;
+  final Set<String> _serviceIcons = <String>{'P', 'Fuel', 'Food', 'Repair'};
+  String _routeFontType = 'B型交通标志专用字体';
+  String _routeRoadClass = '国家高速';
+  String _routeMainCode = 'G15';
+  bool _routeHasBranch = true;
+  String _routeBranchCode = 'W';
+  bool _routeHasAlias = true;
+  String _routeAlias = '沈海高速';
+
+  RoadBoardTemplateSpec get _template =>
+      RoadBoardTemplates.byId(_activeTemplateId) ??
+      RoadBoardTemplates.standardCrossroad;
+
+  bool get _isCrossroadEditing =>
+      _activeTopTab == '自由编辑模式' && _enableCrossroadMode;
 
   @override
   void initState() {
     super.initState();
+    _canvasViewController.addListener(_onCanvasTransformChanged);
+    HardwareKeyboard.instance.addHandler(_handleEditorShortcuts);
     _scene = IntersectionScene(
       name: '张家井',
       intersectionShape: IntersectionShape.crossroad,
@@ -75,12 +143,16 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
         destinationEn: 'Kokimagipume',
       ),
     );
+    _activeBoardColor = _colorNameFor(_scene.backgroundColor);
     _boards = {for (final dir in _dirs) dir: _buildBoard(dir)};
   }
 
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_handleEditorShortcuts);
+    _canvasViewController.removeListener(_onCanvasTransformChanged);
     _canvasViewController.dispose();
+    _editorFocusNode.dispose();
     super.dispose();
   }
 
@@ -90,27 +162,18 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
     final selected = _selectedNode(nodes);
     return Scaffold(
       backgroundColor: const Color(0xFF0B1120),
-      body: CallbackShortcuts(
-        bindings: <ShortcutActivator, VoidCallback>{
-          const SingleActivator(LogicalKeyboardKey.keyC, control: true):
-              _copySelectedNode,
-          const SingleActivator(LogicalKeyboardKey.keyV, control: true):
-              _pasteClipboardNode,
-          const SingleActivator(LogicalKeyboardKey.keyD, control: true):
-              _duplicateSelectedNode,
-          const SingleActivator(LogicalKeyboardKey.delete): _deleteSelectedNode,
-          const SingleActivator(LogicalKeyboardKey.escape): _deselectNode,
-        },
-        child: Focus(
-          autofocus: true,
-          child: SafeArea(
-            child: Column(
-              children: [
-                _buildToolbar(context),
-                Expanded(
-                  child: Row(
-                    children: [
-                      _buildLeftPanel(),
+      body: Focus(
+        focusNode: _editorFocusNode,
+        autofocus: true,
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildToolbar(context),
+              Expanded(
+                child: Row(
+                  children: [
+                    if (_showLeftPanel) _buildLeftPanel(),
+                    if (_showLeftPanel)
                       _buildPanelResizer(
                         onDrag: (delta) => setState(() {
                           _leftPanelWidth = (_leftPanelWidth + delta).clamp(
@@ -119,7 +182,8 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
                           );
                         }),
                       ),
-                      Expanded(child: _buildCanvasPanel(nodes, selected)),
+                    Expanded(child: _buildCanvasPanel(nodes, selected)),
+                    if (_showRightPanel)
                       _buildPanelResizer(
                         onDrag: (delta) => setState(() {
                           _rightPanelWidth = (_rightPanelWidth - delta).clamp(
@@ -128,12 +192,11 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
                           );
                         }),
                       ),
-                      _buildRightPanel(),
-                    ],
-                  ),
+                    if (_showRightPanel) _buildRightPanel(),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -211,6 +274,8 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
             icon: const Icon(Icons.image_outlined, size: 18),
             label: const Text('导出 PNG'),
           ),
+          const SizedBox(width: 16),
+          _buildVsCodeLayoutSwitcher(),
         ],
       ),
     );
@@ -239,6 +304,125 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
     );
   }
 
+  Widget _buildVsCodeLayoutSwitcher() {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1F2937),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _layoutPresetButton(
+            preset: _WorkbenchLayoutPreset.leftOnly,
+            tooltip: '左侧栏 + 画布',
+          ),
+          _layoutPresetButton(
+            preset: _WorkbenchLayoutPreset.centerOnly,
+            tooltip: '仅画布',
+          ),
+          _layoutPresetButton(
+            preset: _WorkbenchLayoutPreset.rightOnly,
+            tooltip: '画布 + 右侧栏',
+          ),
+          _layoutPresetButton(
+            preset: _WorkbenchLayoutPreset.both,
+            tooltip: '左侧栏 + 画布 + 右侧栏',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _layoutPresetButton({
+    required _WorkbenchLayoutPreset preset,
+    required String tooltip,
+  }) {
+    final selected = _layoutPreset == preset;
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: () => _applyLayoutPreset(preset),
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          width: 30,
+          height: 28,
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFF334155) : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          alignment: Alignment.center,
+          child: _layoutPresetGlyph(preset, selected: selected),
+        ),
+      ),
+    );
+  }
+
+  Widget _layoutPresetGlyph(
+    _WorkbenchLayoutPreset preset, {
+    required bool selected,
+  }) {
+    final activeColor = selected ? Colors.white : Colors.white70;
+    final mutedColor = const Color(0xFF475569);
+    Color c(bool on) => on ? activeColor : mutedColor;
+    final showLeft =
+        preset == _WorkbenchLayoutPreset.leftOnly ||
+        preset == _WorkbenchLayoutPreset.both;
+    final showRight =
+        preset == _WorkbenchLayoutPreset.rightOnly ||
+        preset == _WorkbenchLayoutPreset.both;
+    return SizedBox(
+      width: 16,
+      height: 12,
+      child: Row(
+        children: [
+          _glyphBlock(width: 3, color: c(showLeft)),
+          const SizedBox(width: 2),
+          _glyphBlock(width: 6, color: c(true)),
+          const SizedBox(width: 2),
+          _glyphBlock(width: 3, color: c(showRight)),
+        ],
+      ),
+    );
+  }
+
+  Widget _glyphBlock({required double width, required Color color}) {
+    return Container(
+      width: width,
+      height: 10,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(1.5),
+      ),
+    );
+  }
+
+  void _applyLayoutPreset(_WorkbenchLayoutPreset preset) {
+    setState(() {
+      _layoutPreset = preset;
+      switch (preset) {
+        case _WorkbenchLayoutPreset.leftOnly:
+          _showLeftPanel = true;
+          _showRightPanel = false;
+          break;
+        case _WorkbenchLayoutPreset.centerOnly:
+          _showLeftPanel = false;
+          _showRightPanel = false;
+          break;
+        case _WorkbenchLayoutPreset.rightOnly:
+          _showLeftPanel = false;
+          _showRightPanel = true;
+          break;
+        case _WorkbenchLayoutPreset.both:
+          _showLeftPanel = true;
+          _showRightPanel = true;
+          break;
+      }
+    });
+  }
+
   Widget _buildLeftPanel() {
     return Container(
       width: _leftPanelWidth,
@@ -249,66 +433,623 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          _sectionTitle('画布样式', '颜色和路口基本设置'),
-          const SizedBox(height: 12),
-          _colorButton('背景色', _scene.backgroundColor, (c) {
-            setState(() {
-              _scene = _scene.copyWith(backgroundColor: c);
-              _syncBoards();
-            });
-          }),
+          _buildGeneratorPanel(),
+          if (_isCrossroadEditing) ...[
+            const SizedBox(height: 20),
+            _sectionTitle('画布样式', '颜色和路口基本设置'),
+            const SizedBox(height: 12),
+            _colorButton('背景色', _scene.backgroundColor, (c) {
+              setState(() {
+                _scene = _scene.copyWith(backgroundColor: c);
+                _activeBoardColor = _colorNameFor(c);
+                _syncBoards();
+              });
+            }),
+            const SizedBox(height: 10),
+            _colorButton('前景色', _scene.foregroundColor, (c) {
+              setState(() {
+                _scene = _scene.copyWith(foregroundColor: c);
+                _syncBoards();
+              });
+            }),
+            const SizedBox(height: 10),
+            _colorButton('景区色', _scene.scenicColor, (c) {
+              setState(() {
+                _scene = _scene.copyWith(scenicColor: c);
+                _syncBoards();
+              });
+            }),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<IntersectionShape>(
+              initialValue: _scene.intersectionShape,
+              decoration: _inputDecoration('路口形状'),
+              dropdownColor: const Color(0xFF0F172A),
+              items: IntersectionShape.values
+                  .map(
+                    (shape) =>
+                        DropdownMenuItem(value: shape, child: Text(shape.name)),
+                  )
+                  .toList(),
+              onChanged: (shape) {
+                if (shape == null) return;
+                setState(() {
+                  _scene = _scene.copyWith(intersectionShape: shape);
+                  _syncBoards();
+                });
+              },
+            ),
+            const SizedBox(height: 24),
+            _sectionTitle('路口信息', '全局名称和方向配置'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: TextEditingController(text: _scene.name),
+              decoration: _inputDecoration('路口名称'),
+              onChanged: (value) =>
+                  setState(() => _scene = _scene.copyWith(name: value)),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: TextEditingController(text: _junctionNameEn),
+              decoration: _inputDecoration('路口名称拼音'),
+              onChanged: (value) => setState(() => _junctionNameEn = value),
+            ),
+            const SizedBox(height: 16),
+            ..._dirs.map(_buildDirectionEditor),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGeneratorPanel() {
+    final selectedNode = _selectedNode(_boards[_activeDirection]!);
+    final selectedKind = selectedNode == null
+        ? _selectedElementKind
+        : (selectedNode.nodeType == NodeType.graphic
+              ? '图形'
+              : selectedNode.nodeType == NodeType.whiteBox
+              ? '白底'
+              : '文本');
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF1F2937)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '道路交通标志生成工具（GB 5768.2 约束）',
+            style: TextStyle(
+              color: Color(0xFF86EFAC),
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
           const SizedBox(height: 10),
-          _colorButton('前景色', _scene.foregroundColor, (c) {
-            setState(() {
-              _scene = _scene.copyWith(foregroundColor: c);
-              _syncBoards();
-            });
-          }),
-          const SizedBox(height: 10),
-          _colorButton('景区色', _scene.scenicColor, (c) {
-            setState(() {
-              _scene = _scene.copyWith(scenicColor: c);
-              _syncBoards();
-            });
-          }),
-          const SizedBox(height: 10),
-          DropdownButtonFormField<IntersectionShape>(
-            initialValue: _scene.intersectionShape,
-            decoration: _inputDecoration('路口形状'),
-            dropdownColor: const Color(0xFF0F172A),
-            items: IntersectionShape.values
+          const Text(
+            '关联说明：十字路口画布是基础层，不同情景是参数化细化层（共享同一画布与标尺）。',
+            style: TextStyle(color: Colors.white54, fontSize: 11),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: _topTabs
                 .map(
-                  (shape) =>
-                      DropdownMenuItem(value: shape, child: Text(shape.name)),
+                  (tab) => ChoiceChip(
+                    label: Text(tab, style: const TextStyle(fontSize: 11)),
+                    selected: _activeTopTab == tab,
+                    onSelected: (_) => _onTopTabSelected(tab),
+                  ),
                 )
                 .toList(),
-            onChanged: (shape) {
-              if (shape == null) return;
+          ),
+          const SizedBox(height: 12),
+          _buildScenarioEditor(),
+          const SizedBox(height: 12),
+          FilledButton.tonalIcon(
+            onPressed: _applyGbPreset,
+            icon: const Icon(Icons.rule_folder, size: 16),
+            label: const Text('应用 GB 标准预设'),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            '标志类型',
+            style: TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: _signTypes
+                .map(
+                  (type) => ChoiceChip(
+                    label: Text(type, style: const TextStyle(fontSize: 11)),
+                    selected: _activeSignType == type,
+                    onSelected: (_) => _onSignTypeSelected(type),
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            '背景颜色',
+            style: TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            children: _gbBoardColors.entries
+                .map(
+                  (entry) => ChoiceChip(
+                    label: Text(
+                      entry.key,
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    selected: _activeBoardColor == entry.key,
+                    onSelected: (_) => _applyBoardColor(entry.key, entry.value),
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            '不透明度',
+            style: TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          Slider(
+            value: _boardOpacity,
+            min: 0.5,
+            max: 1.0,
+            divisions: 10,
+            label: _boardOpacity.toStringAsFixed(2),
+            onChanged: (v) => setState(() => _boardOpacity = v),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: CheckboxListTile(
+                  dense: true,
+                  value: _showExitDistance,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('出口距离', style: TextStyle(fontSize: 12)),
+                  onChanged: (v) => _toggleExitDistance(v ?? false),
+                ),
+              ),
+              Expanded(
+                child: CheckboxListTile(
+                  dense: true,
+                  value: _showTopInfoBar,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('顶部信息栏', style: TextStyle(fontSize: 12)),
+                  onChanged: (v) => _toggleTopInfoBar(v ?? false),
+                ),
+              ),
+            ],
+          ),
+          const Divider(color: Color(0xFF334155), height: 20),
+          const Text(
+            '正文信息栏',
+            style: TextStyle(color: Colors.white, fontSize: 13),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _nudgeSelected(-12, 0),
+                icon: const Icon(Icons.arrow_back, size: 14),
+                label: const Text('左移', style: TextStyle(fontSize: 11)),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _nudgeSelected(12, 0),
+                icon: const Icon(Icons.arrow_forward, size: 14),
+                label: const Text('右移', style: TextStyle(fontSize: 11)),
+              ),
+              OutlinedButton.icon(
+                onPressed: _duplicateSelectedNode,
+                icon: const Icon(Icons.copy, size: 14),
+                label: const Text('复制', style: TextStyle(fontSize: 11)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Text(
+                '类型',
+                style: TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  initialValue: selectedKind,
+                  items: const [
+                    DropdownMenuItem(value: '文本', child: Text('文本')),
+                    DropdownMenuItem(value: '白底', child: Text('白底')),
+                    DropdownMenuItem(value: '图形', child: Text('图形')),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    _selectedElementKind = value;
+                    _changeSelectedNodeType(value);
+                  },
+                  decoration: _inputDecoration('元素类型'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: TextEditingController(text: selectedNode?.text ?? ''),
+            decoration: _inputDecoration('主文本'),
+            onChanged: (value) {
+              final node = _selectedNode(_boards[_activeDirection]!);
+              if (node == null || node.nodeType == NodeType.graphic) return;
+              _updateSelected(node.copyWith(text: value));
+            },
+          ),
+          CheckboxListTile(
+            dense: true,
+            value: _showEnglishLine,
+            contentPadding: EdgeInsets.zero,
+            title: const Text('添加英文字行', style: TextStyle(fontSize: 12)),
+            onChanged: (v) {
+              final enabled = v ?? false;
+              setState(() => _showEnglishLine = enabled);
+              final node = _selectedNode(_boards[_activeDirection]!);
+              if (node == null || node.nodeType == NodeType.graphic) return;
+              _updateSelected(
+                node.copyWith(
+                  textEn: enabled ? (node.textEn ?? 'English') : '',
+                ),
+              );
+            },
+          ),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _addTextRow,
+                icon: const Icon(Icons.add_circle_outline, size: 14),
+                label: const Text('添加行', style: TextStyle(fontSize: 11)),
+              ),
+              OutlinedButton.icon(
+                onPressed: _addElementBlock,
+                icon: const Icon(Icons.add_box_outlined, size: 14),
+                label: const Text('添加元素', style: TextStyle(fontSize: 11)),
+              ),
+              OutlinedButton.icon(
+                onPressed: _deleteSelectedNode,
+                icon: const Icon(Icons.delete_outline, size: 14),
+                label: const Text('删除行', style: TextStyle(fontSize: 11)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScenarioEditor() {
+    if (_activeTopTab == '地点距离') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '地点距离模板',
+            style: TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: TextEditingController(text: _placeName),
+            decoration: _inputDecoration('主文本'),
+            onChanged: (v) {
               setState(() {
-                _scene = _scene.copyWith(intersectionShape: shape);
+                _placeName = v;
                 _syncBoards();
               });
             },
           ),
-          const SizedBox(height: 24),
-          _sectionTitle('路口信息', '全局名称和方向配置'),
-          const SizedBox(height: 12),
-          TextField(
-            controller: TextEditingController(text: _scene.name),
-            decoration: _inputDecoration('路口名称'),
-            onChanged: (value) =>
-                setState(() => _scene = _scene.copyWith(name: value)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: TextEditingController(text: _placeDistanceKm),
+                  decoration: _inputDecoration('距离(km)'),
+                  onChanged: (v) {
+                    setState(() {
+                      _placeDistanceKm = v;
+                      _syncBoards();
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: _placeIncludeEnglish,
+                  title: const Text('添加英文字行', style: TextStyle(fontSize: 12)),
+                  onChanged: (v) {
+                    setState(() {
+                      _placeIncludeEnglish = v ?? false;
+                      _syncBoards();
+                    });
+                  },
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
-          TextField(
-            controller: TextEditingController(text: _junctionNameEn),
-            decoration: _inputDecoration('路口名称拼音'),
-            onChanged: (value) => setState(() => _junctionNameEn = value),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: _placePrefixIcon,
+                  title: const Text('前缀图标', style: TextStyle(fontSize: 12)),
+                  onChanged: (v) {
+                    setState(() {
+                      _placePrefixIcon = v ?? false;
+                      _syncBoards();
+                    });
+                  },
+                ),
+              ),
+              Expanded(
+                child: CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: _placeSuffixIcon,
+                  title: const Text('后缀图标', style: TextStyle(fontSize: 12)),
+                  onChanged: (v) {
+                    setState(() {
+                      _placeSuffixIcon = v ?? false;
+                      _syncBoards();
+                    });
+                  },
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          ..._dirs.map(_buildDirectionEditor),
         ],
-      ),
+      );
+    }
+    if (_activeTopTab == '服务区距离' || _activeTopTab == '服务区和停车区预告') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _activeTopTab == '服务区距离' ? '服务区距离模板' : '服务区和停车区预告模板',
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: TextEditingController(text: _serviceName),
+            decoration: _inputDecoration('服务区名称'),
+            onChanged: (v) {
+              setState(() {
+                _serviceName = v;
+                _syncBoards();
+              });
+            },
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: TextEditingController(text: _serviceDistanceKm),
+                  decoration: _inputDecoration('距离(km)'),
+                  onChanged: (v) {
+                    setState(() {
+                      _serviceDistanceKm = v;
+                      _syncBoards();
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: _serviceIncludeEnglish,
+                  title: const Text('添加英文字行', style: TextStyle(fontSize: 12)),
+                  onChanged: (v) {
+                    setState(() {
+                      _serviceIncludeEnglish = v ?? false;
+                      _syncBoards();
+                    });
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _serviceIconChip('P', '停车'),
+              _serviceIconChip('Fuel', '加油'),
+              _serviceIconChip('Food', '餐饮'),
+              _serviceIconChip('Repair', '维修'),
+            ],
+          ),
+        ],
+      );
+    }
+    if (_activeTopTab == '道路编号和命名编号') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '道路编号模板',
+            style: TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            children: ['B型交通标志专用字体', 'A型交通标志专用字体']
+                .map(
+                  (font) => ChoiceChip(
+                    label: Text(font, style: const TextStyle(fontSize: 11)),
+                    selected: _routeFontType == font,
+                    onSelected: (_) {
+                      setState(() {
+                        _routeFontType = font;
+                        _syncBoards();
+                      });
+                    },
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            children: ['国家高速', '省级高速', '国道', '省道', '县道/乡道']
+                .map(
+                  (kind) => ChoiceChip(
+                    label: Text(kind, style: const TextStyle(fontSize: 11)),
+                    selected: _routeRoadClass == kind,
+                    onSelected: (_) {
+                      setState(() {
+                        _routeRoadClass = kind;
+                        _syncBoards();
+                      });
+                    },
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: TextEditingController(text: _routeMainCode),
+            decoration: _inputDecoration('主线编号'),
+            onChanged: (v) {
+              setState(() {
+                _routeMainCode = v;
+                _syncBoards();
+              });
+            },
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: _routeHasBranch,
+                  title: const Text('支线编号', style: TextStyle(fontSize: 12)),
+                  onChanged: (v) {
+                    setState(() {
+                      _routeHasBranch = v ?? false;
+                      _syncBoards();
+                    });
+                  },
+                ),
+              ),
+              Expanded(
+                child: TextField(
+                  controller: TextEditingController(text: _routeBranchCode),
+                  decoration: _inputDecoration('支线'),
+                  onChanged: (v) {
+                    setState(() {
+                      _routeBranchCode = v;
+                      _syncBoards();
+                    });
+                  },
+                ),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: CheckboxListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  value: _routeHasAlias,
+                  title: const Text('道路简称', style: TextStyle(fontSize: 12)),
+                  onChanged: (v) {
+                    setState(() {
+                      _routeHasAlias = v ?? false;
+                      _syncBoards();
+                    });
+                  },
+                ),
+              ),
+              Expanded(
+                child: TextField(
+                  controller: TextEditingController(text: _routeAlias),
+                  decoration: _inputDecoration('简称文字'),
+                  onChanged: (v) {
+                    setState(() {
+                      _routeAlias = v;
+                      _syncBoards();
+                    });
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+    if (_activeTopTab == '自由编辑模式') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('十字路口编辑', style: TextStyle(fontSize: 12)),
+            subtitle: const Text(
+              '开启后显示东西南北切换、四向预览与路口参数设置',
+              style: TextStyle(fontSize: 11, color: Colors.white54),
+            ),
+            value: _enableCrossroadMode,
+            onChanged: (enabled) {
+              setState(() {
+                _enableCrossroadMode = enabled;
+                _activeDirection = 'north';
+                _selectedNodeId = 'item_center';
+                _syncBoards();
+              });
+            },
+          ),
+        ],
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  Widget _serviceIconChip(String key, String label) {
+    final selected = _serviceIcons.contains(key);
+    return FilterChip(
+      label: Text(label, style: const TextStyle(fontSize: 11)),
+      selected: selected,
+      onSelected: (enabled) {
+        setState(() {
+          if (enabled) {
+            _serviceIcons.add(key);
+          } else {
+            _serviceIcons.remove(key);
+          }
+          _syncBoards();
+        });
+      },
     );
   }
 
@@ -326,23 +1067,53 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
             ),
             child: Row(
               children: [
-                ..._dirs.map(
-                  (dir) => Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(_dirCn(dir)),
-                      selected: _activeDirection == dir,
-                      onSelected: (_) => setState(() {
-                        _activeDirection = dir;
-                        _selectedNodeId = 'item_center';
-                      }),
+                if (_isCrossroadEditing) ...[
+                  ..._dirs.map(
+                    (dir) => Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(_dirCn(dir)),
+                        selected: _activeDirection == dir,
+                        onSelected: (_) => setState(() {
+                          _activeDirection = dir;
+                          _selectedNodeId = 'item_center';
+                        }),
+                      ),
                     ),
                   ),
-                ),
+                ] else ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1F2937),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _activeTopTab,
+                      style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 TextButton(
                   onPressed: _resetCanvasView,
                   child: const Text('重置视图'),
+                ),
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: () => setState(() {
+                    _verticalGuides.clear();
+                    _horizontalGuides.clear();
+                    _draftVerticalGuide = null;
+                    _draftHorizontalGuide = null;
+                  }),
+                  child: const Text('清空参考线'),
                 ),
                 const SizedBox(width: 8),
                 SizedBox(
@@ -387,25 +1158,28 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Column(
                 children: [
-                  SizedBox(
-                    width: 36,
-                    height: _template.canvasSize.height * _canvasZoom + 28,
-                    child: _buildVerticalRuler(),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
+                  Row(
+                    children: [
+                      const SizedBox(width: 36, height: 28),
+                      Expanded(
+                        child: SizedBox(
                           height: 28,
                           child: _buildHorizontalRuler(),
                         ),
+                      ),
+                    ],
+                  ),
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(width: 36, child: _buildVerticalRuler()),
                         Expanded(
                           child: GestureDetector(
                             onTap: () {
+                              _editorFocusNode.requestFocus();
                               if (_selectedNodeId != null) {
                                 setState(() => _selectedNodeId = null);
                               }
@@ -413,10 +1187,13 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
                             child: Container(
                               decoration: BoxDecoration(
                                 color: const Color(0xFF1E293B),
-                                border: Border.all(color: const Color(0xFF475569)),
+                                border: Border.all(
+                                  color: const Color(0xFF475569),
+                                ),
                               ),
                               child: InteractiveViewer(
                                 transformationController: _canvasViewController,
+                                alignment: Alignment.topLeft,
                                 constrained: false,
                                 boundaryMargin: const EdgeInsets.all(240),
                                 minScale: 1,
@@ -428,19 +1205,66 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
                                   child: Transform.scale(
                                     scale: _canvasZoom,
                                     alignment: Alignment.topLeft,
-                                    child: RoadSignCanvas(
+                                    child: SizedBox(
                                       width: _template.canvasSize.width,
                                       height: _template.canvasSize.height,
-                                      backgroundColor: _scene.backgroundColor,
-                                      borderColor: _scene.foregroundColor,
-                                      borderWidth: 2,
-                                      nodes: nodes,
-                                      selectedNodeId: _selectedNodeId,
-                                      onNodeSelected: (id) =>
-                                          setState(() => _selectedNodeId = id),
-                                      onNodeSecondaryTapDown: _showNodeContextMenu,
-                                      onNodesChanged: _onBoardChanged,
-                                      interactionScale: _canvasZoom,
+                                      child: Stack(
+                                        children: [
+                                          Positioned.fill(
+                                            child: RoadSignCanvas(
+                                              width: _template.canvasSize.width,
+                                              height:
+                                                  _template.canvasSize.height,
+                                              backgroundColor: _scene
+                                                  .backgroundColor
+                                                  .withValues(
+                                                    alpha: _boardOpacity,
+                                                  ),
+                                              headerColor:
+                                                  _template.headerColor,
+                                              headerRatio:
+                                                  _template.headerRatio,
+                                              borderColor:
+                                                  _scene.foregroundColor,
+                                              borderWidth: 2,
+                                              nodes: nodes,
+                                              selectedNodeId: _selectedNodeId,
+                                              onNodeSelected: (id) {
+                                                _editorFocusNode.requestFocus();
+                                                setState(
+                                                  () => _selectedNodeId = id,
+                                                );
+                                              },
+                                              onNodeSecondaryTapDown:
+                                                  _showNodeContextMenu,
+                                              onNodesChanged: _onBoardChanged,
+                                              interactionScale: _canvasZoom,
+                                            ),
+                                          ),
+                                          Positioned.fill(
+                                            child: IgnorePointer(
+                                              child: CustomPaint(
+                                                painter: _GuideOverlayPainter(
+                                                  verticalGuides:
+                                                      List<double>.from(
+                                                        _verticalGuides,
+                                                      ),
+                                                  horizontalGuides:
+                                                      List<double>.from(
+                                                        _horizontalGuides,
+                                                      ),
+                                                  draftVerticalGuide:
+                                                      _draftVerticalGuide,
+                                                  draftHorizontalGuide:
+                                                      _draftHorizontalGuide,
+                                                  contentInset:
+                                                      _boardContentInset,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -455,401 +1279,63 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
               ),
             ),
           ),
+          Container(
+            height: 52,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: const BoxDecoration(
+              color: Color(0xFF111827),
+              border: Border(top: BorderSide(color: Color(0xFF1F2937))),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _exportBoardPng,
+                  icon: const Icon(Icons.download, size: 16),
+                  label: const Text('下载到本地'),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: _copyBoardPathToClipboard,
+                  icon: const Icon(Icons.copy_all, size: 16),
+                  label: const Text('复制到剪贴板'),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildRuler() {
-    return const SizedBox.shrink();
-  }
-
   Widget _buildVerticalRuler() {
-    return Container(
-      width: 36,
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
-        border: Border(
-          right: BorderSide(
-            color: const Color(0xFF334155).withValues(alpha: 0.8),
-            width: 1,
-          ),
-        ),
-      ),
-      child: CustomPaint(
-        painter: _VerticalRulerPainter(
-          canvasHeight: _template.canvasSize.height,
-          zoom: _canvasZoom,
-        ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onVerticalDragStart: (details) =>
+          _startHorizontalGuideFromRuler(details.localPosition.dy),
+      onVerticalDragUpdate: (details) =>
+          _updateHorizontalGuideFromRuler(details.localPosition.dy),
+      onVerticalDragEnd: (_) => _commitHorizontalGuide(),
+      onVerticalDragCancel: _cancelDraftGuide,
+      child: RoadRulerStrip(
+        axis: RulerAxis.vertical,
+        viewport: _viewportModel(),
       ),
     );
   }
 
   Widget _buildHorizontalRuler() {
-    return Container(
-      height: 28,
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
-        border: Border(
-          bottom: BorderSide(
-            color: const Color(0xFF334155).withValues(alpha: 0.8),
-            width: 1,
-          ),
-        ),
-      ),
-      child: CustomPaint(
-        painter: _HorizontalRulerPainter(
-          canvasWidth: _template.canvasSize.width,
-          zoom: _canvasZoom,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomPosition(TextNode? node) {
-    if (node == null) {
-      return const Center(
-        child: Text('请先选择一个元素', style: TextStyle(color: Colors.white38)),
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _positionInput('X', node.x, (v) => _updateNodePosition(node, v, null)),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _positionInput('Y', node.y, (v) => _updateNodePosition(node, null, v)),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _positionInput('宽', node.width, (v) => _updateNodeSize(node, v, null)),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _positionInput('高', node.height, (v) => _updateNodeSize(node, null, v)),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              const Text('对齐: ', style: TextStyle(color: Colors.white54, fontSize: 11)),
-              const SizedBox(width: 8),
-              ChoiceChip(
-                label: const Text('左', style: TextStyle(fontSize: 10)),
-                selected: node.textAlign == TextAlign.left,
-                onSelected: (_) => _updateSelected(node.copyWith(textAlign: TextAlign.left)),
-              ),
-              const SizedBox(width: 4),
-              ChoiceChip(
-                label: const Text('中', style: TextStyle(fontSize: 10)),
-                selected: node.textAlign == TextAlign.center,
-                onSelected: (_) => _updateSelected(node.copyWith(textAlign: TextAlign.center)),
-              ),
-              const SizedBox(width: 4),
-              ChoiceChip(
-                label: const Text('右', style: TextStyle(fontSize: 10)),
-                selected: node.textAlign == TextAlign.right,
-                onSelected: (_) => _updateSelected(node.copyWith(textAlign: TextAlign.right)),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _positionInput(String label, double value, ValueChanged<double> onChanged) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 24,
-          child: Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
-        ),
-        Expanded(
-          child: SizedBox(
-            height: 32,
-            child: TextField(
-              controller: TextEditingController(text: value.round().toString()),
-              style: const TextStyle(color: Colors.white, fontSize: 12),
-              decoration: InputDecoration(
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-                filled: true,
-                fillColor: const Color(0xFF1E293B),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(4),
-                  borderSide: const BorderSide(color: Color(0xFF475569)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(4),
-                  borderSide: const BorderSide(color: Color(0xFF3B82F6)),
-                ),
-              ),
-              onSubmitted: (v) {
-                final parsed = double.tryParse(v);
-                if (parsed != null) onChanged(parsed);
-              },
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBottomStyle(TextNode? node) {
-    if (node == null) {
-      return const Center(
-        child: Text('请先选择一个元素', style: TextStyle(color: Colors.white38)),
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('填充颜色', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  children: [
-                    _colorSwatch(Colors.white, node.fillColor, (c) => _updateSelected(node.copyWith(fillColor: c))),
-                    _colorSwatch(const Color(0xFF20308E), node.fillColor, (c) => _updateSelected(node.copyWith(fillColor: c))),
-                    _colorSwatch(const Color(0xFF8B5A2B), node.fillColor, (c) => _updateSelected(node.copyWith(fillColor: c))),
-                    _colorSwatch(Colors.black, node.fillColor, (c) => _updateSelected(node.copyWith(fillColor: c))),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('边框颜色', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  children: [
-                    _colorSwatch(Colors.transparent, node.borderColor, (c) => _updateSelected(node.copyWith(borderColor: c))),
-                    _colorSwatch(Colors.white, node.borderColor, (c) => _updateSelected(node.copyWith(borderColor: c))),
-                    _colorSwatch(const Color(0xFF20308E), node.borderColor, (c) => _updateSelected(node.copyWith(borderColor: c))),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('边框宽度', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Slider(
-                        value: (node.borderWidth ?? 0).toDouble(),
-                        min: 0,
-                        max: 8,
-                        onChanged: (v) => _updateSelected(node.copyWith(borderWidth: v)),
-                      ),
-                    ),
-                    Text('${node.borderWidth ?? 0}', style: const TextStyle(color: Colors.white60, fontSize: 11)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _colorSwatch(Color color, Color? current, ValueChanged<Color> onSelected) {
-    final isSelected = current?.toARGB32() == color.toARGB32();
-    return InkWell(
-      onTap: () => onSelected(color),
-      child: Container(
-        width: 28,
-        height: 28,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF3B82F6) : Colors.white24,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBottomText(TextNode? node) {
-    if (node == null) {
-      return const Center(
-        child: Text('请先选择一个元素', style: TextStyle(color: Colors.white38)),
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('中文内容', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 40,
-                  child: TextField(
-                    controller: TextEditingController(text: node.text),
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                      filled: true,
-                      fillColor: const Color(0xFF1E293B),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: const BorderSide(color: Color(0xFF475569)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: const BorderSide(color: Color(0xFF3B82F6)),
-                      ),
-                    ),
-                    onSubmitted: (v) => _updateSelected(node.copyWith(text: v)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('英文内容', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 40,
-                  child: TextField(
-                    controller: TextEditingController(text: node.textEn ?? ''),
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                      filled: true,
-                      fillColor: const Color(0xFF1E293B),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: const BorderSide(color: Color(0xFF475569)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: const BorderSide(color: Color(0xFF3B82F6)),
-                      ),
-                    ),
-                    onSubmitted: (v) => _updateSelected(node.copyWith(textEn: v)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('字号', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 40,
-                  child: TextField(
-                    controller: TextEditingController(text: node.style.fontSize?.round().toString() ?? '24'),
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
-                      filled: true,
-                      fillColor: const Color(0xFF1E293B),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: const BorderSide(color: Color(0xFF475569)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(6),
-                        borderSide: const BorderSide(color: Color(0xFF3B82F6)),
-                      ),
-                    ),
-                    onSubmitted: (v) {
-                      final parsed = double.tryParse(v);
-                      if (parsed != null) {
-                        _updateSelected(node.copyWith(style: node.style.copyWith(fontSize: parsed)));
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomLayer(TextNode? node) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('图层操作', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              ActionChip(
-                avatar: const Icon(Icons.flip_to_front, size: 14),
-                label: const Text('置于顶层', style: TextStyle(fontSize: 11)),
-                onPressed: node != null ? () => _moveNodeLayer(node.id, bringToFront: true) : null,
-              ),
-              ActionChip(
-                avatar: const Icon(Icons.flip_to_back, size: 14),
-                label: const Text('置于底层', style: TextStyle(fontSize: 11)),
-                onPressed: node != null ? () => _moveNodeLayer(node.id, bringToFront: false) : null,
-              ),
-              ActionChip(
-                avatar: const Icon(Icons.content_copy, size: 14),
-                label: const Text('复制副本', style: TextStyle(fontSize: 11)),
-                onPressed: _duplicateSelectedNode,
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '当前方向元素数量: ${_boards[_activeDirection]!.length}',
-            style: const TextStyle(color: Colors.white38, fontSize: 11),
-          ),
-        ],
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragStart: (details) =>
+          _startVerticalGuideFromRuler(details.localPosition.dx),
+      onHorizontalDragUpdate: (details) =>
+          _updateVerticalGuideFromRuler(details.localPosition.dx),
+      onHorizontalDragEnd: (_) => _commitVerticalGuide(),
+      onHorizontalDragCancel: _cancelDraftGuide,
+      child: RoadRulerStrip(
+        axis: RulerAxis.horizontal,
+        viewport: _viewportModel(),
       ),
     );
   }
@@ -880,8 +1366,8 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
             child: _rightPanelSection == 0
                 ? _buildPropertyPanel()
                 : _rightPanelSection == 1
-                    ? _buildElementsPanel()
-                    : _buildPreviewPanel(),
+                ? _buildElementsPanel()
+                : _buildPreviewPanel(),
           ),
         ],
       ),
@@ -948,6 +1434,16 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
   }
 
   Widget _buildPreviewPanel() {
+    if (!_isCrossroadEditing) {
+      return ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          _sectionTitle('模板预览', '当前情景单牌预览'),
+          const SizedBox(height: 8),
+          _buildSinglePreviewCard(),
+        ],
+      );
+    }
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
@@ -958,16 +1454,49 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
     );
   }
 
+  Widget _buildSinglePreviewCard() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF253046), width: 1),
+      ),
+      child: AspectRatio(
+        aspectRatio: _template.canvasSize.width / _template.canvasSize.height,
+        child: IgnorePointer(
+          child: RoadSignCanvas(
+            width: _template.canvasSize.width,
+            height: _template.canvasSize.height,
+            backgroundColor: _scene.backgroundColor.withValues(
+              alpha: _boardOpacity,
+            ),
+            borderColor: _scene.foregroundColor,
+            borderWidth: 2,
+            nodes: _boards['north']!,
+            onNodesChanged: (_) {},
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildPropertyPanel() {
     final node = _selectedNode(_boards[_activeDirection]!);
     if (node == null) {
       return const Center(
-        child: Text(
-          '请在画布上选择一个元素',
-          style: TextStyle(color: Colors.white54),
-        ),
+        child: Text('请在画布上选择一个元素', style: TextStyle(color: Colors.white54)),
       );
     }
+    final maxX = (_template.canvasSize.width - node.width).clamp(
+      0.0,
+      double.infinity,
+    );
+    final maxY = (_template.canvasSize.height - node.height).clamp(
+      0.0,
+      double.infinity,
+    );
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
@@ -984,10 +1513,34 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
         ]),
         const SizedBox(height: 12),
         _propertySection('位置与尺寸', [
-          _propertySlider('X', node.x, 0, 600, (v) => _updateNodePosition(node, v, null)),
-          _propertySlider('Y', node.y, 0, 400, (v) => _updateNodePosition(node, null, v)),
-          _propertySlider('宽', node.width, 50, 400, (v) => _updateNodeSize(node, v, null)),
-          _propertySlider('高', node.height, 30, 300, (v) => _updateNodeSize(node, null, v)),
+          _propertySlider(
+            'X',
+            node.x,
+            0,
+            maxX,
+            (v) => _updateNodePosition(node, v, null),
+          ),
+          _propertySlider(
+            'Y',
+            node.y,
+            0,
+            maxY,
+            (v) => _updateNodePosition(node, null, v),
+          ),
+          _propertySlider(
+            '宽',
+            node.width,
+            20,
+            _template.canvasSize.width,
+            (v) => _updateNodeSize(node, v, null),
+          ),
+          _propertySlider(
+            '高',
+            node.height,
+            20,
+            _template.canvasSize.height,
+            (v) => _updateNodeSize(node, null, v),
+          ),
         ]),
         const SizedBox(height: 12),
         _propertySection('对齐', [
@@ -1028,11 +1581,15 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
   final Map<String, TextEditingController> _textControllers = {};
 
   void _disposeControllers(String nodeId) {
-    _textControllers.remove('$nodeId\_text')?.dispose();
-    _textControllers.remove('$nodeId\_textEn')?.dispose();
+    _textControllers.remove('${nodeId}_text')?.dispose();
+    _textControllers.remove('${nodeId}_textEn')?.dispose();
   }
 
-  TextEditingController _getController(String nodeId, String field, String initialValue) {
+  TextEditingController _getController(
+    String nodeId,
+    String field,
+    String initialValue,
+  ) {
     final key = '${nodeId}_$field';
     if (!_textControllers.containsKey(key)) {
       _textControllers[key] = TextEditingController(text: initialValue);
@@ -1056,7 +1613,10 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
         labelText: label,
         labelStyle: const TextStyle(color: Colors.white54, fontSize: 11),
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 10,
+        ),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
         filled: true,
         fillColor: const Color(0xFF1E293B),
@@ -1120,7 +1680,14 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
     );
   }
 
-  Widget _propertySlider(String label, double value, double min, double max, ValueChanged<double> onChanged) {
+  Widget _propertySlider(
+    String label,
+    double value,
+    double min,
+    double max,
+    ValueChanged<double> onChanged,
+  ) {
+    final current = value.clamp(min, max);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -1139,7 +1706,7 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
                 thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
               ),
               child: Slider(
-                value: value.clamp(min, max),
+                value: current,
                 min: min,
                 max: max,
                 onChanged: onChanged,
@@ -1147,9 +1714,35 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
             ),
           ),
           SizedBox(
-            width: 40,
+            width: 58,
+            child: TextField(
+              controller: TextEditingController(
+                text: current.round().toString(),
+              ),
+              style: const TextStyle(color: Colors.white60, fontSize: 11),
+              textAlign: TextAlign.right,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 6,
+                ),
+                border: InputBorder.none,
+              ),
+              onSubmitted: (input) {
+                final parsed = double.tryParse(input.trim());
+                if (parsed == null) return;
+                onChanged(parsed.clamp(min, max));
+              },
+            ),
+          ),
+          SizedBox(
+            width: 36,
             child: Text(
-              value.round().toString(),
+              current.round().toString(),
               style: const TextStyle(color: Colors.white60, fontSize: 11),
               textAlign: TextAlign.right,
             ),
@@ -1170,7 +1763,9 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
           color: const Color(0xFF0F172A),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isSelected ? const Color(0xFF3B82F6) : const Color(0xFF1F2937),
+            color: isSelected
+                ? const Color(0xFF3B82F6)
+                : const Color(0xFF1F2937),
           ),
         ),
         child: Row(
@@ -1179,7 +1774,9 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
               width: 4,
               height: 32,
               decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF3B82F6) : Colors.transparent,
+                color: isSelected
+                    ? const Color(0xFF3B82F6)
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -1215,17 +1812,45 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
   }
 
   void _updateNodePosition(TextNode node, double? x, double? y) {
-    _updateSelected(node.copyWith(
-      x: x ?? node.x,
-      y: y ?? node.y,
-    ));
+    final maxX = (_template.canvasSize.width - node.width).clamp(
+      0.0,
+      double.infinity,
+    );
+    final maxY = (_template.canvasSize.height - node.height).clamp(
+      0.0,
+      double.infinity,
+    );
+    _updateSelected(
+      node.copyWith(
+        x: (x ?? node.x).clamp(0, maxX),
+        y: (y ?? node.y).clamp(0, maxY),
+      ),
+    );
   }
 
   void _updateNodeSize(TextNode node, double? w, double? h) {
-    _updateSelected(node.copyWith(
-      width: w ?? node.width,
-      height: h ?? node.height,
-    ));
+    final newWidth = (w ?? node.width)
+        .clamp(20.0, _template.canvasSize.width)
+        .toDouble();
+    final newHeight = (h ?? node.height)
+        .clamp(20.0, _template.canvasSize.height)
+        .toDouble();
+    final maxX = (_template.canvasSize.width - newWidth).clamp(
+      0.0,
+      double.infinity,
+    );
+    final maxY = (_template.canvasSize.height - newHeight).clamp(
+      0.0,
+      double.infinity,
+    );
+    _updateSelected(
+      node.copyWith(
+        width: newWidth,
+        height: newHeight,
+        x: node.x.clamp(0.0, maxX).toDouble(),
+        y: node.y.clamp(0.0, maxY).toDouble(),
+      ),
+    );
   }
 
   Widget _buildDirectionEditor(String dir) {
@@ -1305,7 +1930,11 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
                 child: RoadSignCanvas(
                   width: _template.canvasSize.width,
                   height: _template.canvasSize.height,
-                  backgroundColor: _scene.backgroundColor,
+                  backgroundColor: _scene.backgroundColor.withValues(
+                    alpha: _boardOpacity,
+                  ),
+                  headerColor: _template.headerColor,
+                  headerRatio: _template.headerRatio,
                   borderColor: _scene.foregroundColor,
                   borderWidth: 2,
                   nodes: _boards[dir]!,
@@ -1419,8 +2048,15 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
   }
 
   void _onBoardChanged(List<TextNode> nodes) {
+    final fixed = nodes
+        .map((node) => _normalizeTextBoundsIfNeeded(node))
+        .map((node) => _clampNodeToBoard(node))
+        .map(
+          (node) => node.id == _selectedNodeId ? _snapNodeToGuides(node) : node,
+        )
+        .toList();
     setState(() {
-      _boards[_activeDirection] = nodes;
+      _boards[_activeDirection] = fixed;
     });
   }
 
@@ -1428,6 +2064,7 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
     _canvasViewController.value = Matrix4.identity();
     setState(() {
       _canvasZoom = 0.78;
+      _canvasPanOffset = Offset.zero;
     });
   }
 
@@ -1436,6 +2073,540 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
         .map((node) => node.id == updated.id ? updated : node)
         .toList();
     _onBoardChanged(nodes);
+  }
+
+  void _onCanvasTransformChanged() {
+    final matrix = _canvasViewController.value;
+    final pan = Offset(matrix.storage[12], matrix.storage[13]);
+    if (pan == _canvasPanOffset) return;
+    setState(() {
+      _canvasPanOffset = pan;
+    });
+  }
+
+  bool _handleEditorShortcuts(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    final focused = FocusManager.instance.primaryFocus?.context?.widget;
+    if (focused is EditableText) return false;
+    final isCtrl = HardwareKeyboard.instance.isControlPressed;
+    final key = event.logicalKey;
+    if (isCtrl && key == LogicalKeyboardKey.keyC) {
+      _copySelectedNode();
+      return true;
+    }
+    if (isCtrl && key == LogicalKeyboardKey.keyV) {
+      _pasteClipboardNode();
+      return true;
+    }
+    if (isCtrl && key == LogicalKeyboardKey.keyD) {
+      _duplicateSelectedNode();
+      return true;
+    }
+    if (key == LogicalKeyboardKey.delete) {
+      _deleteSelectedNode();
+      return true;
+    }
+    if (key == LogicalKeyboardKey.escape) {
+      _deselectNode();
+      return true;
+    }
+    return false;
+  }
+
+  void _applyGbPreset() {
+    setState(() {
+      _activeBoardColor = '蓝色';
+      _boardOpacity = 1.0;
+      _scene = _scene.copyWith(
+        backgroundColor: _gbBoardColors['蓝色']!,
+        foregroundColor: Colors.white,
+        scenicColor: const Color(0xFF8B5A2B),
+      );
+      for (final dir in _dirs) {
+        final normalized = _boards[dir]!.map((node) {
+          if (node.nodeType == NodeType.graphic) {
+            return node.copyWith(
+              style: node.style.copyWith(color: Colors.white),
+              width: node.width.clamp(120.0, 240.0),
+              height: node.height.clamp(120.0, 240.0),
+            );
+          }
+          final slot = node.slotId == null
+              ? null
+              : _template.slots[node.slotId!];
+          final fontSize = slot?.fontSize ?? node.style.fontSize ?? 24;
+          return node.copyWith(
+            style: node.style.copyWith(
+              color: node.nodeType == NodeType.whiteBox
+                  ? (_scene.backgroundColor)
+                  : Colors.white,
+              fontSize: fontSize,
+              fontWeight: FontWeight.w700,
+            ),
+            borderWidth: node.nodeType == NodeType.whiteBox
+                ? 2
+                : node.borderWidth,
+          );
+        }).toList();
+        _boards[dir] = normalized;
+      }
+    });
+    _showMessage('已应用 GB 5768.2 预设');
+  }
+
+  void _onTopTabSelected(String tab) {
+    _activeTopTab = tab;
+    if (tab != '自由编辑模式') {
+      _enableCrossroadMode = false;
+      _activeDirection = 'north';
+    }
+    _activeTemplateId = _templateIdForTab(tab);
+    _applyScenarioPreset(tab);
+  }
+
+  String _templateIdForTab(String tab) {
+    return switch (tab) {
+      '地点距离' => RoadBoardTemplates.placeDistanceId,
+      '服务区距离' => RoadBoardTemplates.serviceDistanceId,
+      '服务区和停车区预告' => RoadBoardTemplates.serviceAdvanceId,
+      '道路编号和命名编号' => RoadBoardTemplates.routeNumberId,
+      '自由编辑模式' => RoadBoardTemplates.freeComposeId,
+      _ => RoadBoardTemplates.freeComposeId,
+    };
+  }
+
+  String _tabForTemplateId(String templateId) {
+    return switch (templateId) {
+      RoadBoardTemplates.placeDistanceId => '地点距离',
+      RoadBoardTemplates.serviceDistanceId => '服务区距离',
+      RoadBoardTemplates.serviceAdvanceId => '服务区和停车区预告',
+      RoadBoardTemplates.routeNumberId => '道路编号和命名编号',
+      RoadBoardTemplates.freeComposeId => '自由编辑模式',
+      RoadBoardTemplates.standardCrossroadId => '自由编辑模式',
+      _ => '自由编辑模式',
+    };
+  }
+
+  void _onSignTypeSelected(String type) {
+    setState(() {
+      _activeSignType = type;
+      for (final dir in _dirs) {
+        _boards[dir] = _applySignTypeToNodes(_boards[dir]!, type);
+      }
+    });
+  }
+
+  List<TextNode> _applySignTypeToNodes(List<TextNode> source, String type) {
+    final nodes = [...source];
+    final centerIndex = nodes.indexWhere((node) => node.id == 'item_center');
+    if (centerIndex < 0) return nodes;
+    final center = nodes[centerIndex];
+    GraphicType targetGraphic = center.graphicType ?? GraphicType.crossroad;
+    switch (type) {
+      case '左出口↖':
+      case '左出口↑':
+        targetGraphic = GraphicType.skewLeft;
+        break;
+      case '右出口↗':
+      case '右出口↑':
+        targetGraphic = GraphicType.skewRight;
+        break;
+      case '直行↑':
+      case '车道指引↓':
+      case '自由模式':
+        targetGraphic = GraphicType.crossroad;
+        break;
+    }
+    nodes[centerIndex] = center.copyWith(
+      nodeType: NodeType.graphic,
+      graphicType: targetGraphic,
+      style: center.style.copyWith(color: _scene.foregroundColor),
+    );
+    return nodes;
+  }
+
+  void _applyBoardColor(String name, Color color) {
+    setState(() {
+      _activeBoardColor = name;
+      _scene = _scene.copyWith(backgroundColor: color);
+      _syncBoards();
+    });
+    _applyScenarioPreset(_activeTopTab);
+  }
+
+  void _toggleExitDistance(bool enabled) {
+    _showExitDistance = enabled;
+    _upsertUtilityNodeAllDirections(
+      enabled: enabled,
+      nodeId: 'utility_exit_distance',
+      create: (direction) => TextNode(
+        id: 'utility_exit_distance',
+        x: _template.canvasSize.width - 220,
+        y: _template.canvasSize.height - 42,
+        width: 190,
+        height: 28,
+        text: '出口 500m',
+        textEn: 'Exit 500m',
+        nodeType: NodeType.whiteBox,
+        fillColor: Colors.white,
+        backgroundColor: _scene.backgroundColor,
+        style: TextStyle(
+          color: _scene.backgroundColor,
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  void _toggleTopInfoBar(bool enabled) {
+    _showTopInfoBar = enabled;
+    _upsertUtilityNodeAllDirections(
+      enabled: enabled,
+      nodeId: 'utility_top_info',
+      create: (direction) => TextNode(
+        id: 'utility_top_info',
+        x: 220,
+        y: 8,
+        width: 560,
+        height: 30,
+        text: '道路编号 G2 · 京沪高速',
+        textEn: 'G2 Beijing-Shanghai Expressway',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  void _upsertUtilityNodeAllDirections({
+    required bool enabled,
+    required String nodeId,
+    required TextNode Function(String direction) create,
+  }) {
+    setState(() {
+      for (final dir in _dirs) {
+        _boards[dir] = _upsertUtilityNodeForList(
+          _boards[dir]!,
+          enabled: enabled,
+          nodeId: nodeId,
+          create: () => create(dir),
+        );
+      }
+    });
+  }
+
+  List<TextNode> _upsertUtilityNodeForList(
+    List<TextNode> source, {
+    required bool enabled,
+    required String nodeId,
+    required TextNode Function() create,
+  }) {
+    final nodes = [...source];
+    final index = nodes.indexWhere((node) => node.id == nodeId);
+    if (enabled && index < 0) {
+      nodes.add(create());
+    }
+    if (!enabled && index >= 0) {
+      nodes.removeAt(index);
+    }
+    return nodes;
+  }
+
+  void _applyScenarioPreset(String tab) {
+    setState(() {
+      _boards = {for (final dir in _dirs) dir: _buildBoard(dir)};
+      _selectedNodeId = 'item_center';
+      switch (tab) {
+        case '地点距离':
+          _showExitDistance = true;
+          _showTopInfoBar = false;
+          _activeSignType = '直行↑';
+          break;
+        case '服务区距离':
+          _showExitDistance = true;
+          _showTopInfoBar = true;
+          _activeSignType = '直行↑';
+          break;
+        case '服务区和停车区预告':
+          _showExitDistance = false;
+          _showTopInfoBar = true;
+          _activeSignType = '直行↑';
+          break;
+        case '道路编号和命名编号':
+          _showExitDistance = false;
+          _showTopInfoBar = true;
+          _activeSignType = '车道指引↓';
+          break;
+        case '自由编辑模式':
+          _showExitDistance = false;
+          _showTopInfoBar = false;
+          _activeSignType = '自由模式';
+          break;
+        default:
+          break;
+      }
+
+      for (final dir in _dirs) {
+        _boards[dir] = _applySignTypeToNodes(_boards[dir]!, _activeSignType);
+      }
+    });
+  }
+
+  void _nudgeSelected(double dx, double dy) {
+    final node = _selectedNode(_boards[_activeDirection]!);
+    if (node == null) return;
+    _updateNodePosition(node, node.x + dx, node.y + dy);
+  }
+
+  void _changeSelectedNodeType(String kind) {
+    final node = _selectedNode(_boards[_activeDirection]!);
+    if (node == null) return;
+    if (kind == '图形') {
+      _updateSelected(
+        node.copyWith(
+          nodeType: NodeType.graphic,
+          text: '',
+          textEn: '',
+          fillColor: null,
+          borderColor: null,
+          borderWidth: null,
+          width: node.width.clamp(120.0, 220.0),
+          height: node.height.clamp(120.0, 220.0),
+          graphicType: _graphicTypeForShape(_scene.intersectionShape),
+          style: const TextStyle(color: Colors.white),
+        ),
+      );
+      return;
+    }
+    if (kind == '白底') {
+      _updateSelected(
+        node.copyWith(
+          nodeType: NodeType.whiteBox,
+          fillColor: Colors.white,
+          backgroundColor: _scene.backgroundColor,
+          borderColor: Colors.transparent,
+          borderWidth: 0,
+          text: node.text.isEmpty ? '地名' : node.text,
+          style: TextStyle(
+            color: _scene.backgroundColor,
+            fontSize: node.style.fontSize ?? 22,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+      return;
+    }
+    _updateSelected(
+      node.copyWith(
+        nodeType: NodeType.text,
+        fillColor: null,
+        borderColor: null,
+        borderWidth: null,
+        text: node.text.isEmpty ? '道路名称' : node.text,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: node.style.fontSize ?? 30,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  void _addTextRow() {
+    final rows = _boards[_activeDirection]!
+        .where((node) => node.slotId == 'free_row')
+        .length;
+    final y = 70 + rows * 42;
+    final node = TextNode(
+      id: 'free_row_${DateTime.now().microsecondsSinceEpoch}',
+      x: 80,
+      y: y.toDouble(),
+      slotId: 'free_row',
+      width: 360,
+      height: 42,
+      text: '正文 ${rows + 1}',
+      textEn: _showEnglishLine ? 'Line ${rows + 1}' : '',
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 30,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+    setState(() {
+      _boards[_activeDirection] = [..._boards[_activeDirection]!, node];
+      _selectedNodeId = node.id;
+    });
+  }
+
+  void _addElementBlock() {
+    final node = TextNode(
+      id: 'free_element_${DateTime.now().microsecondsSinceEpoch}',
+      x: 90,
+      y: 120,
+      slotId: 'free_element',
+      width: 220,
+      height: 64,
+      text: '附加信息',
+      textEn: _showEnglishLine ? 'Additional Info' : '',
+      nodeType: NodeType.whiteBox,
+      fillColor: Colors.white,
+      backgroundColor: _scene.backgroundColor,
+      borderColor: Colors.transparent,
+      borderWidth: 0,
+      style: TextStyle(
+        color: _scene.backgroundColor,
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+    setState(() {
+      _boards[_activeDirection] = [..._boards[_activeDirection]!, node];
+      _selectedNodeId = node.id;
+    });
+  }
+
+  RoadCanvasViewport _viewportModel() {
+    return RoadCanvasViewport(
+      zoom: _canvasZoom,
+      pan: _canvasPanOffset,
+      canvasSize: _template.canvasSize,
+      contentOriginX: _boardContentInset,
+      contentOriginY: _boardContentInset,
+    );
+  }
+
+  void _startVerticalGuideFromRuler(double localX) {
+    setState(() {
+      _draftVerticalGuide = _viewportModel().worldFromScreenX(localX);
+    });
+  }
+
+  void _updateVerticalGuideFromRuler(double localX) {
+    if (_draftVerticalGuide == null) return;
+    setState(() {
+      _draftVerticalGuide = _viewportModel().worldFromScreenX(localX);
+    });
+  }
+
+  void _commitVerticalGuide() {
+    final value = _draftVerticalGuide;
+    if (value == null) return;
+    final clamped = value.clamp(0.0, _template.canvasSize.width).toDouble();
+    setState(() {
+      _verticalGuides.add(clamped);
+      _verticalGuides.sort();
+      _draftVerticalGuide = null;
+    });
+  }
+
+  void _startHorizontalGuideFromRuler(double localY) {
+    setState(() {
+      _draftHorizontalGuide = _viewportModel().worldFromScreenY(localY);
+    });
+  }
+
+  void _updateHorizontalGuideFromRuler(double localY) {
+    if (_draftHorizontalGuide == null) return;
+    setState(() {
+      _draftHorizontalGuide = _viewportModel().worldFromScreenY(localY);
+    });
+  }
+
+  void _commitHorizontalGuide() {
+    final value = _draftHorizontalGuide;
+    if (value == null) return;
+    final clamped = value.clamp(0.0, _template.canvasSize.height).toDouble();
+    setState(() {
+      _horizontalGuides.add(clamped);
+      _horizontalGuides.sort();
+      _draftHorizontalGuide = null;
+    });
+  }
+
+  void _cancelDraftGuide() {
+    setState(() {
+      _draftVerticalGuide = null;
+      _draftHorizontalGuide = null;
+    });
+  }
+
+  TextNode _normalizeTextBoundsIfNeeded(TextNode node) {
+    if (node.nodeType == NodeType.graphic) return node;
+    final style = node.style;
+    final textPainter = TextPainter(
+      text: TextSpan(text: node.text, style: style),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: _template.canvasSize.width);
+    double targetWidth = textPainter.width + 24;
+    double targetHeight = textPainter.height + 16;
+    if ((node.textEn ?? '').isNotEmpty) {
+      final enStyle = style.copyWith(
+        fontSize: (style.fontSize ?? 24) * 0.42,
+        fontWeight: FontWeight.w500,
+      );
+      final enPainter = TextPainter(
+        text: TextSpan(text: node.textEn!, style: enStyle),
+        textDirection: TextDirection.ltr,
+      )..layout(maxWidth: _template.canvasSize.width);
+      targetWidth = targetWidth > enPainter.width + 24
+          ? targetWidth
+          : enPainter.width + 24;
+      targetHeight += enPainter.height + 4;
+    }
+    targetWidth = targetWidth.clamp(20, _template.canvasSize.width);
+    targetHeight = targetHeight.clamp(20, _template.canvasSize.height);
+    final x = node.x
+        .clamp(0.0, _template.canvasSize.width - targetWidth)
+        .toDouble();
+    final y = node.y
+        .clamp(0.0, _template.canvasSize.height - targetHeight)
+        .toDouble();
+    return node.copyWith(width: targetWidth, height: targetHeight, x: x, y: y);
+  }
+
+  TextNode _clampNodeToBoard(TextNode node) {
+    final maxX = (_template.canvasSize.width - node.width).clamp(
+      0.0,
+      double.infinity,
+    );
+    final maxY = (_template.canvasSize.height - node.height).clamp(
+      0.0,
+      double.infinity,
+    );
+    return node.copyWith(x: node.x.clamp(0, maxX), y: node.y.clamp(0, maxY));
+  }
+
+  TextNode _snapNodeToGuides(TextNode node) {
+    if (node.nodeType == NodeType.graphic) return node;
+    final threshold = 8 / _canvasZoom;
+    var snappedX = node.x;
+    var snappedY = node.y;
+    final centerX = node.x + node.width / 2;
+    final centerY = node.y + node.height / 2;
+    for (final guide in _verticalGuides) {
+      if ((node.x - guide).abs() <= threshold) {
+        snappedX = guide;
+        break;
+      }
+      if ((centerX - guide).abs() <= threshold) {
+        snappedX = guide - node.width / 2;
+        break;
+      }
+    }
+    for (final guide in _horizontalGuides) {
+      if ((node.y - guide).abs() <= threshold) {
+        snappedY = guide;
+        break;
+      }
+      if ((centerY - guide).abs() <= threshold) {
+        snappedY = guide - node.height / 2;
+        break;
+      }
+    }
+    return _clampNodeToBoard(node.copyWith(x: snappedX, y: snappedY));
   }
 
   void _copySelectedNode() {
@@ -1644,6 +2815,8 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
 
   void _newProject() {
     setState(() {
+      _activeTopTab = '自由编辑模式';
+      _activeTemplateId = RoadBoardTemplates.freeComposeId;
       _scene = IntersectionScene(
         name: '张家井',
         intersectionShape: IntersectionShape.crossroad,
@@ -1700,6 +2873,10 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
       Map<String, dynamic>.from(jsonDecode(content) as Map),
     );
     setState(() {
+      _activeTemplateId = RoadBoardTemplates.byId(doc.templateId) != null
+          ? doc.templateId
+          : RoadBoardTemplates.standardCrossroadId;
+      _activeTopTab = _tabForTemplateId(_activeTemplateId);
       _scene = doc.toScene();
       _junctionNameEn = doc.junctionNameEn;
       _activeDirection = _dirs.contains(doc.activeDirection)
@@ -1767,6 +2944,23 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
   }
 
   List<TextNode> _buildBoard(String direction) {
+    if (_activeTemplateId == RoadBoardTemplates.placeDistanceId) {
+      return _buildPlaceDistanceBoard(direction);
+    }
+    if (_activeTemplateId == RoadBoardTemplates.serviceDistanceId ||
+        _activeTemplateId == RoadBoardTemplates.serviceAdvanceId) {
+      return _buildServiceDistanceBoard(direction);
+    }
+    if (_activeTemplateId == RoadBoardTemplates.routeNumberId) {
+      return _buildRouteNumberBoard(direction);
+    }
+    if (_activeTemplateId == RoadBoardTemplates.freeComposeId) {
+      return _buildFreeComposeBoard(direction);
+    }
+    return _buildCrossroadBoard(direction);
+  }
+
+  List<TextNode> _buildCrossroadBoard(String direction) {
     final slots = _template.slots;
     final current = direction;
     final left = _leftOf(direction);
@@ -1835,6 +3029,196 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
         slots['bottomRight']!,
       ),
     ];
+  }
+
+  List<TextNode> _buildPlaceDistanceBoard(String direction) {
+    final slots = _template.slots;
+    final titleSlot = slots['topCenter']!;
+    final valueSlot = slots['topRight']!;
+
+    String finalPlaceName = _placeName;
+    if (_placePrefixIcon) finalPlaceName = '📍 $finalPlaceName';
+    if (_placeSuffixIcon) finalPlaceName = '$finalPlaceName ⛽';
+
+    return [
+      TextNode(
+        id: 'item_place_name',
+        x: titleSlot.rect.left,
+        y: titleSlot.rect.top,
+        slotId: 'topCenter',
+        width: titleSlot.rect.width,
+        height: titleSlot.rect.height,
+        text: finalPlaceName,
+        textEn: _placeIncludeEnglish ? 'Place Name' : '',
+        textAlign: TextAlign.left,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 80,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      TextNode(
+        id: 'item_place_distance',
+        x: valueSlot.rect.left,
+        y: valueSlot.rect.top,
+        slotId: 'topRight',
+        width: valueSlot.rect.width,
+        height: valueSlot.rect.height,
+        text: '$_placeDistanceKm km',
+        textAlign: TextAlign.right,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 80,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    ];
+  }
+
+  List<TextNode> _buildServiceDistanceBoard(String direction) {
+    final slots = _template.slots;
+    final iconText = _serviceIcons
+        .map((item) {
+          switch (item) {
+            case 'P':
+              return 'P';
+            case 'Fuel':
+              return '⛽';
+            case 'Food':
+              return '🍴';
+            case 'Repair':
+              return '🛠';
+            default:
+              return '';
+          }
+        })
+        .join(' ');
+    return [
+      TextNode(
+        id: 'item_service_icons',
+        x: slots['topCenter']!.rect.left,
+        y: slots['topCenter']!.rect.top,
+        width: slots['topCenter']!.rect.width,
+        height: slots['topCenter']!.rect.height,
+        text: iconText.isEmpty ? 'P ⛽ 🍴 🛠' : iconText,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 64,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      TextNode(
+        id: 'item_service_name',
+        x: slots['centerLeft']!.rect.left,
+        y: slots['centerLeft']!.rect.top,
+        width: slots['centerLeft']!.rect.width,
+        height: slots['centerLeft']!.rect.height,
+        text: _serviceName,
+        textEn: _serviceIncludeEnglish ? 'Service Area' : '',
+        textAlign: TextAlign.left,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 60,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      TextNode(
+        id: 'item_service_distance',
+        x: slots['centerRight']!.rect.left,
+        y: slots['centerRight']!.rect.top,
+        width: slots['centerRight']!.rect.width,
+        height: slots['centerRight']!.rect.height,
+        text: _activeTemplateId == RoadBoardTemplates.serviceAdvanceId
+            ? '↗'
+            : '$_serviceDistanceKm km',
+        textAlign: TextAlign.right,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 60,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    ];
+  }
+
+  List<TextNode> _buildRouteNumberBoard(String direction) {
+    final slots = _template.slots;
+
+    // Fallbacks just in case headers are not defined
+    final ratio = _template.headerRatio ?? 0.28;
+    final dividerY = _template.canvasSize.height * ratio - 2;
+
+    return [
+      TextNode(
+        id: 'item_route_header',
+        x: slots['topCenter']!.rect.left,
+        y: slots['topCenter']!.rect.top,
+        width: slots['topCenter']!.rect.width,
+        height: slots['topCenter']!.rect.height,
+        text: _routeRoadClass,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 32,
+          fontWeight: _routeFontType.contains('A型')
+              ? FontWeight.w500
+              : FontWeight.w700,
+        ),
+      ),
+      TextNode(
+        id: 'item_route_divider',
+        x: 0,
+        y: dividerY,
+        width: _template.canvasSize.width,
+        height: 6,
+        text: '',
+        nodeType: NodeType.whiteBox,
+        fillColor: Colors.white,
+        backgroundColor: Colors.white,
+        borderColor: Colors.transparent,
+        borderWidth: 0,
+        style: const TextStyle(fontSize: 1),
+      ),
+      TextNode(
+        id: 'item_route_code',
+        x: slots['center']!.rect.left,
+        y: slots['center']!.rect.top,
+        width: slots['center']!.rect.width,
+        height: slots['center']!.rect.height,
+        text: _routeHasBranch
+            ? '$_routeMainCode$_routeBranchCode'
+            : _routeMainCode,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 100,
+          fontWeight: _routeFontType.contains('A型')
+              ? FontWeight.w500
+              : FontWeight.w800,
+        ),
+      ),
+      TextNode(
+        id: 'item_route_alias',
+        x: slots['bottomCenter']!.rect.left,
+        y: slots['bottomCenter']!.rect.top,
+        width: slots['bottomCenter']!.rect.width,
+        height: slots['bottomCenter']!.rect.height,
+        text: _routeHasAlias ? _routeAlias : '',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 40,
+          fontWeight: _routeFontType.contains('A型')
+              ? FontWeight.w500
+              : FontWeight.w700,
+        ),
+      ),
+    ];
+  }
+
+  List<TextNode> _buildFreeComposeBoard(String direction) {
+    return _buildCrossroadBoard(direction);
   }
 
   TextNode _badgeNode(
@@ -1927,7 +3311,7 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
           slotId: 'free',
           width: 170,
           height: 70,
-          text: '鐧藉簳瀛愮墝',
+          text: '白底子牌',
           textEn: 'Subtitle',
           nodeType: NodeType.whiteBox,
           fillColor: Colors.white,
@@ -1953,7 +3337,7 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
           slotId: 'free',
           width: 200,
           height: 70,
-          text: '妫曞簳瀛愮墝',
+          text: '棕底子牌',
           textEn: 'Scenic Place',
           nodeType: NodeType.whiteBox,
           fillColor: _scene.scenicColor,
@@ -2008,7 +3392,7 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text('宸蹭繚瀛?JSON锛?{file.path}')));
+    ).showSnackBar(SnackBar(content: Text('已保存 JSON：${file.path}')));
   }
 
   Future<void> _exportBoardPng() async {
@@ -2017,7 +3401,7 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('瀵煎嚭澶辫触')));
+      ).showSnackBar(const SnackBar(content: Text('导出失败')));
       return;
     }
     final path = await ExportUtils.saveImage(
@@ -2026,13 +3410,40 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(path == null ? '瀵煎嚭澶辫触' : '宸蹭繚瀛?PNG锛?path')),
+      SnackBar(content: Text(path == null ? '导出失败' : '已保存 PNG：$path')),
     );
   }
 
   String _safeName(String raw) {
     final sanitized = raw.replaceAll(RegExp(r'[<>:"/\\|?*]+'), '_').trim();
     return sanitized.isEmpty ? 'road_board' : sanitized;
+  }
+
+  String _colorNameFor(Color color) {
+    for (final entry in _gbBoardColors.entries) {
+      if (entry.value.toARGB32() == color.toARGB32()) {
+        return entry.key;
+      }
+    }
+    return '蓝色';
+  }
+
+  Future<void> _copyBoardPathToClipboard() async {
+    final bytes = await ExportUtils.captureWidget(_boardKey);
+    if (bytes == null) {
+      _showMessage('复制失败：未获取到画板图像');
+      return;
+    }
+    final path = await ExportUtils.saveImage(
+      bytes,
+      '${_safeName('${_scene.name}_$_activeDirection')}.png',
+    );
+    if (path == null) {
+      _showMessage('复制失败：保存图像失败');
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: path));
+    _showMessage('已复制图片路径到剪贴板');
   }
 
   GraphicType _graphicTypeForShape(IntersectionShape shape) {
@@ -2099,104 +3510,58 @@ class _RoadEditorPageState extends State<RoadEditorPage> {
   }
 }
 
-class _HorizontalRulerPainter extends CustomPainter {
-  final double canvasWidth;
-  final double zoom;
+class _GuideOverlayPainter extends CustomPainter {
+  const _GuideOverlayPainter({
+    required this.verticalGuides,
+    required this.horizontalGuides,
+    required this.draftVerticalGuide,
+    required this.draftHorizontalGuide,
+    required this.contentInset,
+  });
 
-  _HorizontalRulerPainter({required this.canvasWidth, required this.zoom});
+  final List<double> verticalGuides;
+  final List<double> horizontalGuides;
+  final double? draftVerticalGuide;
+  final double? draftHorizontalGuide;
+  final double contentInset;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final tickPaint = Paint()
-      ..color = const Color(0xFF64748B)
+    final guidePaint = Paint()
+      ..color = const Color(0xFFEAB308).withValues(alpha: 0.75)
+      ..strokeWidth = 1;
+    final draftPaint = Paint()
+      ..color = const Color(0xFF22C55E).withValues(alpha: 0.9)
       ..strokeWidth = 1;
 
-    final majorTickPaint = Paint()
-      ..color = const Color(0xFF94A3B8)
-      ..strokeWidth = 1;
-
-    final textStyle = const TextStyle(
-      color: Color(0xFFE2E8F0),
-      fontSize: 10,
-      fontWeight: FontWeight.w500,
-    );
-
-    const step = 50;
-
-    for (double x = 0; x <= canvasWidth; x += step) {
-      final dx = x * zoom;
-      final isMajor = x % 100 == 0;
-      
-      canvas.drawLine(
-        Offset(dx, isMajor ? 0 : size.height * 0.4),
-        Offset(dx, size.height),
-        isMajor ? majorTickPaint : tickPaint,
-      );
-      
-      if (isMajor && x > 0) {
-        final textSpan = TextSpan(text: x.toInt().toString(), style: textStyle);
-        final textPainter = TextPainter(
-          text: textSpan,
-          textDirection: TextDirection.ltr,
-        )..layout();
-        textPainter.paint(canvas, Offset(dx - textPainter.width / 2, 2));
-      }
+    for (final x in verticalGuides) {
+      final px = x + contentInset;
+      canvas.drawLine(Offset(px, 0), Offset(px, size.height), guidePaint);
+    }
+    for (final y in horizontalGuides) {
+      final py = y + contentInset;
+      canvas.drawLine(Offset(0, py), Offset(size.width, py), guidePaint);
+    }
+    if (draftVerticalGuide != null) {
+      final x = (draftVerticalGuide! + contentInset)
+          .clamp(0.0, size.width)
+          .toDouble();
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), draftPaint);
+    }
+    if (draftHorizontalGuide != null) {
+      final y = (draftHorizontalGuide! + contentInset)
+          .clamp(0.0, size.height)
+          .toDouble();
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), draftPaint);
     }
   }
 
   @override
-  bool shouldRepaint(covariant _HorizontalRulerPainter oldDelegate) {
-    return oldDelegate.canvasWidth != canvasWidth || oldDelegate.zoom != zoom;
-  }
-}
-
-class _VerticalRulerPainter extends CustomPainter {
-  final double canvasHeight;
-  final double zoom;
-
-  _VerticalRulerPainter({required this.canvasHeight, required this.zoom});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final tickPaint = Paint()
-      ..color = const Color(0xFF64748B)
-      ..strokeWidth = 1;
-
-    final majorTickPaint = Paint()
-      ..color = const Color(0xFF94A3B8)
-      ..strokeWidth = 1;
-
-    final textStyle = const TextStyle(
-      color: Color(0xFFE2E8F0),
-      fontSize: 10,
-      fontWeight: FontWeight.w500,
-    );
-
-    const step = 50;
-
-    for (double y = 0; y <= canvasHeight; y += step) {
-      final dy = y * zoom;
-      final isMajor = y % 100 == 0;
-      
-      canvas.drawLine(
-        Offset(0, dy),
-        Offset(isMajor ? size.width : size.width * 0.6, dy),
-        isMajor ? majorTickPaint : tickPaint,
-      );
-      
-        if (isMajor && y > 0) {
-        final textSpan = TextSpan(text: y.toInt().toString(), style: textStyle);
-        final textPainter = TextPainter(
-          text: textSpan,
-          textDirection: TextDirection.ltr,
-        )..layout();
-        textPainter.paint(canvas, Offset(2, dy - textPainter.height / 2));
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_VerticalRulerPainter oldDelegate) {
-    return oldDelegate.canvasHeight != canvasHeight || oldDelegate.zoom != zoom;
+  bool shouldRepaint(covariant _GuideOverlayPainter oldDelegate) {
+    return oldDelegate.verticalGuides != verticalGuides ||
+        oldDelegate.horizontalGuides != horizontalGuides ||
+        oldDelegate.draftVerticalGuide != draftVerticalGuide ||
+        oldDelegate.draftHorizontalGuide != draftHorizontalGuide ||
+        oldDelegate.contentInset != contentInset;
   }
 }

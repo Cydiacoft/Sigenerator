@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 enum NodeType { text, whiteBox, graphic }
 
@@ -416,6 +416,8 @@ class RoadSignCanvas extends StatelessWidget {
     this.selectedNodeId,
     this.onNodeSelected,
     this.onNodeSecondaryTapDown,
+    this.headerColor,
+    this.headerRatio,
   });
 
   final double width;
@@ -430,6 +432,8 @@ class RoadSignCanvas extends StatelessWidget {
   final ValueChanged<String>? onNodeSelected;
   final void Function(TextNode node, Offset globalPosition)?
   onNodeSecondaryTapDown;
+  final Color? headerColor;
+  final double? headerRatio;
 
   @override
   Widget build(BuildContext context) {
@@ -437,7 +441,15 @@ class RoadSignCanvas extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: headerColor == null ? backgroundColor : null,
+        gradient: headerColor != null && headerRatio != null
+            ? LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                stops: [headerRatio!, headerRatio!],
+                colors: [headerColor!, backgroundColor],
+              )
+            : null,
         border: Border.all(color: borderColor, width: borderWidth),
         borderRadius: BorderRadius.circular(6),
       ),
@@ -459,11 +471,17 @@ class RoadSignCanvas extends StatelessWidget {
                         node: node,
                         onChanged: (updated) => _replaceNode(updated),
                       );
-                final hitWidth = node.width + 28;
-                final hitHeight = node.height + 24;
+                final hitPaddingX = node.nodeType == NodeType.graphic
+                    ? 14.0
+                    : 6.0;
+                final hitPaddingY = node.nodeType == NodeType.graphic
+                    ? 12.0
+                    : 6.0;
+                final hitWidth = node.width + hitPaddingX * 2;
+                final hitHeight = node.height + hitPaddingY * 2;
                 return Positioned(
-                  left: (node.x - 14).clamp(0.0, width - hitWidth),
-                  top: (node.y - 12).clamp(0.0, height - hitHeight),
+                  left: (node.x - hitPaddingX).clamp(0.0, width - hitWidth),
+                  top: (node.y - hitPaddingY).clamp(0.0, height - hitHeight),
                   child: GestureDetector(
                     behavior: HitTestBehavior.translucent,
                     onTap: () => onNodeSelected?.call(node.id),
@@ -477,8 +495,8 @@ class RoadSignCanvas extends StatelessWidget {
                     onPanUpdate: (details) {
                       final maxX = width - node.width - 12;
                       final maxY = height - node.height - 12;
-                      final dx = details.delta.dx;
-                      final dy = details.delta.dy;
+                      final dx = details.delta.dx / interactionScale;
+                      final dy = details.delta.dy / interactionScale;
                       _replaceNode(
                         node.copyWith(
                           x: (node.x + dx).clamp(0.0, maxX),
@@ -490,7 +508,12 @@ class RoadSignCanvas extends StatelessWidget {
                       width: hitWidth,
                       height: hitHeight,
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                        padding: EdgeInsets.fromLTRB(
+                          hitPaddingX,
+                          hitPaddingY,
+                          hitPaddingX,
+                          hitPaddingY,
+                        ),
                         child: Container(
                           decoration: isSelected
                               ? BoxDecoration(

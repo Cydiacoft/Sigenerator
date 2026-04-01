@@ -44,6 +44,9 @@
 | R9 | Align road-editor workspace style and text layout controls with the metro editor UX | Completed | Added a dark three-panel workspace, horizontal text alignment controls, and larger drag hit areas. |
 | R10 | Improve road-editor viewport usability | Completed | Added resizable side panels, canvas zoom, and drag-follow correction under scaling. |
 | R11 | Restore road-board viewport control and desktop editing workflow | Completed | Added board panning, project file open/save/save-as, keyboard shortcuts, and canvas right-click actions. |
+| R12 | Upgrade ruler and viewport to data-driven editor state | Completed | Added viewport model, PS-style pan-linked ruler strips, global shortcut handling, and analyzer-clean integration. |
+| R13 | Add guide drag/snap and harden editor string/encoding stability | Completed | Added ruler-driven guides + snap, dynamic property ranges/custom numeric input, UTF-8 guardrails, and analyzer-clean stabilization. |
+| R14 | Fix vertical ruler alignment and container clipping | Completed | Restructured ruler container grid with a 36x28 corner spacer and vertical stretch, preventing vertical clipping during zoom/pan mapping. |
 
 ## Implementation Notes
 

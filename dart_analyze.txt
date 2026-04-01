@@ -1,0 +1,8 @@
+Analyzing road_creator...
+
+  error - lib\pages\road_editor_page.dart:283:27 - The getter 'dock_to_left_outlined' isn't defined for the type 'Icons'. Try importing the library that defines 'dock_to_left_outlined', correcting the name to the name of an existing getter, or defining a getter or field named 'dock_to_left_outlined'. - undefined_getter
+  error - lib\pages\road_editor_page.dart:295:21 - Arguments of a constant creation must be constant expressions. Try making the argument a valid constant, or use 'new' to call the constructor. - const_with_non_constant_argument
+  error - lib\pages\road_editor_page.dart:295:27 - The getter 'dock_to_bottom_outlined' isn't defined for the type 'Icons'. Try importing the library that defines 'dock_to_bottom_outlined', correcting the name to the name of an existing getter, or defining a getter or field named 'dock_to_bottom_outlined'. - undefined_getter
+  error - lib\pages\road_editor_page.dart:307:27 - The getter 'dock_to_right_outlined' isn't defined for the type 'Icons'. Try importing the library that defines 'dock_to_right_outlined', correcting the name to the name of an existing getter, or defining a getter or field named 'dock_to_right_outlined'. - undefined_getter
+
+4 issues found.
