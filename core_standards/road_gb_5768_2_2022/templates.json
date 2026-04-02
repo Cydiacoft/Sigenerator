@@ -19,10 +19,22 @@
     {
       "id": "place_distance",
       "name": "Place Distance Board",
-      "canvasSize": { "width": 600, "height": 180 },
+      "canvasSize": { "width": 1020, "height": 502 },
+      "backgroundSvgAsset": "assets/road_signs_info/svg/China_road_sign_\u8def_17a.svg",
       "slots": [
-        { "id": "topCenter", "rect": { "x": 40, "y": 30, "width": 380, "height": 120 } },
-        { "id": "topRight", "rect": { "x": 440, "y": 30, "width": 120, "height": 120 } }
+        { "id": "topCenter", "rect": { "x": 82, "y": 114, "width": 611, "height": 277 } },
+        { "id": "topRight", "rect": { "x": 692, "y": 114, "width": 246, "height": 277 } }
+      ]
+    },
+    {
+      "id": "place_distance_multiline",
+      "name": "Place Distance Multi-line Board",
+      "canvasSize": { "width": 1020, "height": 843 },
+      "backgroundSvgAsset": "assets/road_signs_info/svg/China_road_sign_\u8def_16.svg",
+      "slots": [
+        { "id": "topCenter", "rect": { "x": 60, "y": 351, "width": 651, "height": 200 } },
+        { "id": "topRight", "rect": { "x": 727, "y": 351, "width": 230, "height": 200 } },
+        { "id": "bottomCenter", "rect": { "x": 60, "y": 591, "width": 902, "height": 180 } }
       ]
     },
     {

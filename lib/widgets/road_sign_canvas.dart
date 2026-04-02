@@ -570,6 +570,15 @@ class RoadSignCanvas extends StatelessWidget {
 
   String? _inferBackgroundSvgAsset(List<TextNode> items) {
     final ids = items.map((item) => item.id).toSet();
+    final isPlaceDistanceBoard =
+        ids.contains('item_place_name') && ids.contains('item_place_distance');
+    if (isPlaceDistanceBoard) {
+      final aspect = height == 0 ? 1.0 : width / height;
+      // road_17a is wide (~2.03), road_16 is close to square (~1.21).
+      return aspect > 1.6
+          ? 'assets/road_signs_info/svg/China_road_sign_\u8def_17a.svg'
+          : 'assets/road_signs_info/svg/China_road_sign_\u8def_16.svg';
+    }
     final isRouteNumberBoard =
         ids.contains('item_route_header') &&
         ids.contains('item_route_code') &&

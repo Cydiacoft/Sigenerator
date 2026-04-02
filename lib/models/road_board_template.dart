@@ -84,6 +84,7 @@ class RoadBoardSlotSpec {
 class RoadBoardTemplates {
   static const String standardCrossroadId = 'standard_crossroad';
   static const String placeDistanceId = 'place_distance';
+  static const String placeDistanceMultilineId = 'place_distance_multiline';
   static const String serviceDistanceId = 'service_distance';
   static const String serviceAdvanceId = 'service_advance';
   static const String routeNumberId = 'route_number';
@@ -149,18 +150,43 @@ class RoadBoardTemplates {
   static const RoadBoardTemplateSpec placeDistance = RoadBoardTemplateSpec(
     id: placeDistanceId,
     name: 'Place Distance Board',
-    canvasSize: Size(600, 180),
+    canvasSize: Size(1020, 502),
+    backgroundSvgAsset:
+        'assets/road_signs_info/svg/China_road_sign_\u8def_17a.svg',
     slots: {
       'topCenter': RoadBoardSlotSpec(
         id: 'topCenter',
-        rect: Rect.fromLTWH(40, 30, 380, 120),
+        rect: Rect.fromLTWH(82, 114, 611, 277),
       ),
       'topRight': RoadBoardSlotSpec(
         id: 'topRight',
-        rect: Rect.fromLTWH(440, 30, 120, 120),
+        rect: Rect.fromLTWH(692, 114, 246, 277),
       ),
     },
   );
+
+  static const RoadBoardTemplateSpec placeDistanceMultiline =
+      RoadBoardTemplateSpec(
+        id: placeDistanceMultilineId,
+        name: 'Place Distance Multi-line Board',
+        canvasSize: Size(1020, 843),
+        backgroundSvgAsset:
+            'assets/road_signs_info/svg/China_road_sign_\u8def_16.svg',
+        slots: {
+          'topCenter': RoadBoardSlotSpec(
+            id: 'topCenter',
+            rect: Rect.fromLTWH(60, 351, 651, 200),
+          ),
+          'topRight': RoadBoardSlotSpec(
+            id: 'topRight',
+            rect: Rect.fromLTWH(727, 351, 230, 200),
+          ),
+          'bottomCenter': RoadBoardSlotSpec(
+            id: 'bottomCenter',
+            rect: Rect.fromLTWH(60, 591, 902, 180),
+          ),
+        },
+      );
 
   static const RoadBoardTemplateSpec serviceDistance = RoadBoardTemplateSpec(
     id: serviceDistanceId,
@@ -284,6 +310,7 @@ class RoadBoardTemplates {
       <RoadBoardTemplateSpec>[
         standardCrossroad,
         placeDistance,
+        placeDistanceMultiline,
         serviceDistance,
         serviceAdvance,
         routeNumber,
