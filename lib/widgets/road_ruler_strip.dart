@@ -58,6 +58,8 @@ class _RoadRulerPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final bgPaint = Paint()..color = backgroundColor;
     canvas.drawRect(Offset.zero & size, bgPaint);
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
 
     final tickPaint = Paint()
       ..color = tickColor
@@ -102,6 +104,7 @@ class _RoadRulerPainter extends CustomPainter {
         textStyle,
       );
     }
+    canvas.restore();
   }
 
   void _paintHorizontal(
@@ -131,7 +134,8 @@ class _RoadRulerPainter extends CustomPainter {
           text: TextSpan(text: label, style: textStyle),
           textDirection: TextDirection.ltr,
         )..layout();
-        tp.paint(canvas, Offset(x - tp.width / 2, 1));
+        final labelX = (x - tp.width / 2).clamp(0.0, size.width - tp.width);
+        tp.paint(canvas, Offset(labelX.toDouble(), 1));
       }
       value += minor;
     }
@@ -167,7 +171,8 @@ class _RoadRulerPainter extends CustomPainter {
           text: TextSpan(text: label, style: textStyle),
           textDirection: TextDirection.ltr,
         )..layout();
-        tp.paint(canvas, Offset(2, y - tp.height / 2));
+        final labelY = (y - tp.height / 2).clamp(0.0, size.height - tp.height);
+        tp.paint(canvas, Offset(2, labelY.toDouble()));
       }
       value += minor;
     }

@@ -437,17 +437,25 @@ class RoadSignCanvas extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final validHeaderRatio =
+        headerRatio != null && headerRatio! > 0 && headerRatio! < 1;
+    final useGradient = headerColor != null && validHeaderRatio;
     return Container(
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: headerColor == null ? backgroundColor : null,
-        gradient: headerColor != null && headerRatio != null
+        color: useGradient ? null : backgroundColor,
+        gradient: useGradient
             ? LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                stops: [headerRatio!, headerRatio!],
-                colors: [headerColor!, backgroundColor],
+                stops: [0.0, headerRatio!, headerRatio!, 1.0],
+                colors: [
+                  headerColor!,
+                  headerColor!,
+                  backgroundColor,
+                  backgroundColor,
+                ],
               )
             : null,
         border: Border.all(color: borderColor, width: borderWidth),
