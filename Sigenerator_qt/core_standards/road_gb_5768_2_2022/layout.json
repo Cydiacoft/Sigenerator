@@ -1,0 +1,84 @@
+{
+  "standard": "GB 5768.2-2022",
+  "version": "0.1.0",
+  "canvas": {
+    "padding": 6,
+    "borderWidth": 2
+  },
+  "typography": {
+    "fontFamily": "RoadSignGB",
+    "fontWeight": 700
+  },
+  "ratios": {
+    "headerRatio": 0.28
+  },
+  "roadEditor": {
+    "defaultTab": "自由编辑模式",
+    "tabs": [
+      "地点距离",
+      "服务区距离",
+      "服务区和停车区预告",
+      "道路编号和命名编号",
+      "自由编辑模式"
+    ],
+    "signTypes": [
+      "自由模式",
+      "左出口↖",
+      "左出口↑",
+      "直行↑",
+      "车道指引↓",
+      "右出口↗",
+      "右出口↑"
+    ],
+    "tabTemplateMap": {
+      "地点距离": "place_distance",
+      "服务区距离": "service_distance",
+      "服务区和停车区预告": "service_advance",
+      "道路编号和命名编号": "route_number",
+      "自由编辑模式": "free_compose"
+    },
+    "signTypeMap": {
+      "free": "自由模式",
+      "straight": "直行↑",
+      "lane_guide": "车道指引↓"
+    },
+    "routeFontTypes": [
+      "B型交通标志专用字体",
+      "A型交通标志专用字体"
+    ],
+    "routeRoadClasses": [
+      "国家高速",
+      "省级高速",
+      "国道",
+      "省道",
+      "县道/乡道"
+    ],
+    "scenarioPresets": {
+      "place_distance": {
+        "showExitDistance": true,
+        "showTopInfoBar": false,
+        "signTypeId": "straight"
+      },
+      "service_distance": {
+        "showExitDistance": true,
+        "showTopInfoBar": true,
+        "signTypeId": "straight"
+      },
+      "service_advance": {
+        "showExitDistance": false,
+        "showTopInfoBar": true,
+        "signTypeId": "straight"
+      },
+      "route_number": {
+        "showExitDistance": false,
+        "showTopInfoBar": true,
+        "signTypeId": "lane_guide"
+      },
+      "free_compose": {
+        "showExitDistance": false,
+        "showTopInfoBar": false,
+        "signTypeId": "free"
+      }
+    }
+  }
+}

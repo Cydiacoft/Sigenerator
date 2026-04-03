@@ -1,0 +1,9 @@
+{
+  "standard": "GB 5768.2-2022",
+  "version": "0.1.0",
+  "sizes": {
+    "title": 40,
+    "primary": 32,
+    "secondary": 18
+  }
+}

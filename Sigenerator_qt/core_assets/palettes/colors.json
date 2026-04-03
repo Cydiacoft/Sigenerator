@@ -1,0 +1,23 @@
+{
+  "palettes": [
+    {
+      "id": "gb_road",
+      "name": "GB Road",
+      "colors": [
+        { "id": "green", "label": "绿色", "hex": "#007A22" },
+        { "id": "blue", "label": "蓝色", "hex": "#20308E" },
+        { "id": "brown", "label": "棕色", "hex": "#8B5A2B" },
+        { "id": "white", "label": "白色", "hex": "#FFFFFF" }
+      ]
+    },
+    {
+      "id": "metro_default",
+      "name": "Metro Default",
+      "colors": [
+        { "id": "line_red", "label": "Line Red", "hex": "#D32F2F" },
+        { "id": "line_blue", "label": "Line Blue", "hex": "#1E88E5" },
+        { "id": "line_green", "label": "Line Green", "hex": "#43A047" }
+      ]
+    }
+  ]
+}

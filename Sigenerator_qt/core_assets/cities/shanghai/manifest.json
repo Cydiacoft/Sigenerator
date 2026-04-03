@@ -1,0 +1,9 @@
+{
+  "cityId": "shanghai",
+  "name": "Shanghai Metro",
+  "version": "1.0.0",
+  "categories": ["metro_line", "metro_station"],
+  "assetCollections": ["metro_base"],
+  "standards": ["metro_guide/shanghai"],
+  "tags": ["cn", "metro"]
+}

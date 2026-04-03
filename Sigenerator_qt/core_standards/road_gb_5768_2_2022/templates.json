@@ -1,0 +1,88 @@
+{
+  "templates": [
+    {
+      "id": "standard_crossroad",
+      "name": "Standard Crossroad Guide Board",
+      "canvasSize": { "width": 1020, "height": 496 },
+      "slots": [
+        { "id": "topLeft", "rect": { "x": 22, "y": 18, "width": 134, "height": 82 }, "fontSize": 30, "useWhiteBox": true },
+        { "id": "topCenter", "rect": { "x": 186, "y": 18, "width": 404, "height": 84 }, "fontSize": 40 },
+        { "id": "topRight", "rect": { "x": 790, "y": 18, "width": 192, "height": 80 }, "fontSize": 22, "useWhiteBox": true },
+        { "id": "centerLeft", "rect": { "x": 22, "y": 128, "width": 294, "height": 92 }, "fontSize": 38 },
+        { "id": "center", "rect": { "x": 414, "y": 110, "width": 192, "height": 170 } },
+        { "id": "centerRight", "rect": { "x": 692, "y": 128, "width": 290, "height": 92 }, "fontSize": 38 },
+        { "id": "bottomLeft", "rect": { "x": 22, "y": 344, "width": 254, "height": 64 }, "fontSize": 18, "useWhiteBox": true, "useScenicBorder": true },
+        { "id": "bottomCenter", "rect": { "x": 432, "y": 354, "width": 194, "height": 66 }, "fontSize": 36 },
+        { "id": "bottomRight", "rect": { "x": 790, "y": 344, "width": 192, "height": 64 }, "fontSize": 18, "useWhiteBox": true }
+      ]
+    },
+    {
+      "id": "place_distance",
+      "name": "Place Distance Board",
+      "canvasSize": { "width": 1020, "height": 502 },
+      "backgroundSvgAsset": "assets/road_signs_info/svg/place_distance_17a.svg",
+      "slots": [
+        { "id": "topCenter", "rect": { "x": 82, "y": 114, "width": 611, "height": 277 } },
+        { "id": "topRight", "rect": { "x": 692, "y": 114, "width": 246, "height": 277 } }
+      ]
+    },
+    {
+      "id": "place_distance_multiline",
+      "name": "Place Distance Multi-line Board",
+      "canvasSize": { "width": 1020, "height": 843 },
+      "backgroundSvgAsset": "assets/road_signs_info/svg/place_distance_16.svg",
+      "slots": [
+        { "id": "topCenter", "rect": { "x": 60, "y": 351, "width": 651, "height": 200 } },
+        { "id": "topRight", "rect": { "x": 727, "y": 351, "width": 230, "height": 200 } },
+        { "id": "bottomCenter", "rect": { "x": 60, "y": 591, "width": 902, "height": 180 } }
+      ]
+    },
+    {
+      "id": "service_distance",
+      "name": "Service Distance Board",
+      "canvasSize": { "width": 480, "height": 260 },
+      "slots": [
+        { "id": "topCenter", "rect": { "x": 40, "y": 20, "width": 400, "height": 100 } },
+        { "id": "centerLeft", "rect": { "x": 40, "y": 130, "width": 280, "height": 100 } },
+        { "id": "centerRight", "rect": { "x": 340, "y": 130, "width": 100, "height": 100 } }
+      ]
+    },
+    {
+      "id": "service_advance",
+      "name": "Service And Parking Advance Board",
+      "canvasSize": { "width": 480, "height": 260 },
+      "slots": [
+        { "id": "topCenter", "rect": { "x": 40, "y": 20, "width": 400, "height": 100 } },
+        { "id": "centerLeft", "rect": { "x": 40, "y": 130, "width": 280, "height": 100 } },
+        { "id": "centerRight", "rect": { "x": 340, "y": 130, "width": 100, "height": 100 } }
+      ]
+    },
+    {
+      "id": "route_number",
+      "name": "Route Number Board",
+      "canvasSize": { "width": 470, "height": 452 },
+      "backgroundSvgAsset": "assets/road_signs_prc/svg/China_Expressway_Sign_without_number.svg",
+      "slots": [
+        { "id": "topCenter", "rect": { "x": 40, "y": 34, "width": 390, "height": 72 } },
+        { "id": "center", "rect": { "x": 38, "y": 128, "width": 394, "height": 186 } },
+        { "id": "bottomCenter", "rect": { "x": 48, "y": 334, "width": 374, "height": 84 } }
+      ]
+    },
+    {
+      "id": "free_compose",
+      "name": "Free Compose Board",
+      "canvasSize": { "width": 1020, "height": 496 },
+      "slots": [
+        { "id": "topLeft", "rect": { "x": 24, "y": 20, "width": 140, "height": 80 }, "fontSize": 30, "useWhiteBox": true },
+        { "id": "topCenter", "rect": { "x": 184, "y": 20, "width": 402, "height": 80 }, "fontSize": 34 },
+        { "id": "topRight", "rect": { "x": 700, "y": 20, "width": 286, "height": 80 }, "fontSize": 22, "useWhiteBox": true },
+        { "id": "centerLeft", "rect": { "x": 24, "y": 124, "width": 300, "height": 96 }, "fontSize": 34 },
+        { "id": "center", "rect": { "x": 416, "y": 108, "width": 190, "height": 172 } },
+        { "id": "centerRight", "rect": { "x": 690, "y": 124, "width": 300, "height": 96 }, "fontSize": 34 },
+        { "id": "bottomLeft", "rect": { "x": 30, "y": 336, "width": 284, "height": 72 }, "fontSize": 20, "useWhiteBox": true },
+        { "id": "bottomCenter", "rect": { "x": 398, "y": 350, "width": 228, "height": 66 }, "fontSize": 30 },
+        { "id": "bottomRight", "rect": { "x": 700, "y": 336, "width": 284, "height": 72 }, "fontSize": 20, "useWhiteBox": true }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "categoryId": "metro_station",
+  "displayName": "Metro Station",
+  "fields": [
+    { "id": "nameCn", "type": "string", "required": true },
+    { "id": "nameEn", "type": "string", "required": false },
+    { "id": "icon", "type": "asset", "required": false }
+  ],
+  "style": {
+    "defaultFont": "MetroSans",
+    "defaultStroke": 0
+  }
+}

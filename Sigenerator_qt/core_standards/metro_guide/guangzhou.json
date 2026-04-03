@@ -1,0 +1,13 @@
+{
+  "standard": "Metro Guide",
+  "cityId": "guangzhou",
+  "version": "0.1.0",
+  "fonts": {
+    "primary": "MetroSans",
+    "secondary": "MetroSans"
+  },
+  "colors": {
+    "background": "#FFFFFF",
+    "text": "#0B1120"
+  }
+}

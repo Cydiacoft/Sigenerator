@@ -1,0 +1,7 @@
+{
+  "rulesVersion": "0.1.0",
+  "formats": [
+    { "id": "png", "dpi": 300, "transparent": false },
+    { "id": "svg", "embedFonts": false }
+  ]
+}

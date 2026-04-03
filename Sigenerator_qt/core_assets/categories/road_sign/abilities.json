@@ -1,0 +1,14 @@
+{
+  "categoryId": "road_sign",
+  "displayName": "Road Sign",
+  "fields": [
+    { "id": "signType", "type": "string", "required": true },
+    { "id": "primaryText", "type": "string", "required": true },
+    { "id": "secondaryText", "type": "string", "required": false },
+    { "id": "distance", "type": "number", "required": false }
+  ],
+  "style": {
+    "defaultFont": "RoadSignGB",
+    "defaultStroke": 2
+  }
+}

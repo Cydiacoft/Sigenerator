@@ -1,0 +1,15 @@
+{
+  "rulesVersion": "0.1.0",
+  "guides": {
+    "snapTolerance": 6,
+    "showRulers": true
+  },
+  "alignment": {
+    "allowLeft": true,
+    "allowCenter": true,
+    "allowRight": true
+  },
+  "bounds": {
+    "clampToCanvas": true
+  }
+}

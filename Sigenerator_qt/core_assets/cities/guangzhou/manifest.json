@@ -1,0 +1,9 @@
+{
+  "cityId": "guangzhou",
+  "name": "Guangzhou Metro",
+  "version": "1.0.0",
+  "categories": ["metro_line", "metro_station"],
+  "assetCollections": ["metro_base"],
+  "standards": ["metro_guide/guangzhou"],
+  "tags": ["cn", "metro"]
+}

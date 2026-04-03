@@ -1,0 +1,8 @@
+{
+  "tags": [
+    { "id": "cn", "label": "China" },
+    { "id": "hk", "label": "Hong Kong" },
+    { "id": "metro", "label": "Metro" },
+    { "id": "road", "label": "Road" }
+  ]
+}

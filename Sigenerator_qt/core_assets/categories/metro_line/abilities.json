@@ -1,0 +1,14 @@
+{
+  "categoryId": "metro_line",
+  "displayName": "Metro Line",
+  "fields": [
+    { "id": "lineId", "type": "string", "required": true },
+    { "id": "name", "type": "string", "required": true },
+    { "id": "color", "type": "color", "required": true },
+    { "id": "shortName", "type": "string", "required": false }
+  ],
+  "style": {
+    "defaultFont": "MetroSans",
+    "defaultStroke": 0
+  }
+}
